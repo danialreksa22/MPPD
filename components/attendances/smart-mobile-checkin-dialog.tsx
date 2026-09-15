@@ -28,7 +28,9 @@ import {
   Sparkles,
   Smartphone,
   Crosshair,
+  Layers,
 } from "lucide-react"
+import { WorkShift, autoDetectCurrentShift, DEFAULT_SHIFTS } from "@/lib/validations/shifts"
 
 export interface SmartMobilePlacementOption {
   id: string
@@ -49,6 +51,7 @@ interface SmartMobileCheckinDialogProps {
   roomName?: string
   activePlacements?: SmartMobilePlacementOption[]
   defaultPlacementId?: string
+  shifts?: WorkShift[]
   onSuccess?: () => void
 }
 
@@ -61,6 +64,7 @@ export function SmartMobileCheckinDialog({
   roomName,
   activePlacements,
   defaultPlacementId,
+  shifts = DEFAULT_SHIFTS,
   onSuccess,
 }: SmartMobileCheckinDialogProps) {
   return (
@@ -75,6 +79,7 @@ export function SmartMobileCheckinDialog({
             roomName={roomName}
             activePlacements={activePlacements}
             defaultPlacementId={defaultPlacementId}
+            shifts={shifts}
             onSuccess={onSuccess}
           />
         )}
@@ -91,13 +96,20 @@ function SmartMobileCheckinInner({
   roomName,
   activePlacements,
   defaultPlacementId,
+  shifts = DEFAULT_SHIFTS,
   onSuccess,
 }: Omit<SmartMobileCheckinDialogProps, "open">) {
+  const effectiveShifts = shifts && shifts.length > 0 ? shifts : DEFAULT_SHIFTS
+  const detectedShift = autoDetectCurrentShift(effectiveShifts, new Date())
+
   const [isPending, startTransition] = useTransition()
 
   // Selection of active placement if multiple are provided
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>(
     defaultPlacementId || activePlacements?.[0]?.id || placementId || ""
+  )
+  const [selectedShiftId, setSelectedShiftId] = useState<string>(
+    detectedShift?.id || effectiveShifts[0]?.id || "shift-pagi"
   )
 
   const activePlacement = activePlacements?.find((p) => p.id === selectedPlacementId)
@@ -105,6 +117,7 @@ function SmartMobileCheckinInner({
   const effStudentName = activePlacement?.student_name || studentName || "Mahasiswa"
   const effStudentNim = activePlacement?.student_nim || studentNim || "-"
   const effRoomName = activePlacement?.room_name || roomName || "Ruangan Stase Dinas"
+  const currentShift = effectiveShifts.find((s) => s.id === selectedShiftId) || effectiveShifts[0]
 
   // Steps: 1: Geolocation, 2: Biometric / Camera, 3: Completed
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -382,6 +395,10 @@ function SmartMobileCheckinInner({
       formData.set("mock_detection_reason", geoResult.mockReason)
     }
     formData.set("verification_method", verificationMethod)
+    if (currentShift) {
+      formData.set("shift_id", currentShift.id)
+      formData.set("shift_name", currentShift.name)
+    }
     if (capturedSelfie) {
       formData.set("selfie_snapshot", capturedSelfie)
     }
@@ -466,6 +483,39 @@ function SmartMobileCheckinInner({
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Shift Dinas Selector (Step 1) */}
+        {step === 1 && (
+          <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Shift Dinas Aktif:
+              </label>
+              <span className="text-[10px] text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10">
+                Auto-Deteksi Jam
+              </span>
+            </div>
+            <select
+              value={selectedShiftId}
+              onChange={(e) => setSelectedShiftId(e.target.value)}
+              className="w-full h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-hidden"
+            >
+              {effectiveShifts.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_time} - {s.end_time})
+                  {s.is_cross_day ? " [Lintas Hari]" : ""} &bull; Toleransi {s.late_tolerance_minutes}m
+                </option>
+              ))}
+            </select>
+            {currentShift && (
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                <span>Jam Kerja: <b className="text-foreground">{currentShift.start_time} - {currentShift.end_time} WITA</b></span>
+                <span>Toleransi: <b className="text-foreground">{currentShift.late_tolerance_minutes} mnt</b></span>
+              </div>
+            )}
           </div>
         )}
 
@@ -791,6 +841,10 @@ function SmartMobileCheckinInner({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Ruangan Stase:</span>
                 <span className="font-semibold text-foreground">{effRoomName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shift Dinas:</span>
+                <span className="font-semibold text-primary">{currentShift?.name || "Shift Pagi"} ({currentShift?.start_time} - {currentShift?.end_time})</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Radius Geofence:</span>

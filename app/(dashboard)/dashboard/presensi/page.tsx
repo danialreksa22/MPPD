@@ -3,6 +3,7 @@ import {
   getTodayAttendancesAction,
   getAttendanceSummaryAction,
 } from "@/actions/attendances"
+import { getWorkShiftsAction } from "@/actions/shifts"
 import { AttendanceManager } from "@/components/attendances/attendance-manager"
 import { RoomUnit, Period } from "@/types"
 
@@ -12,12 +13,14 @@ export default async function PresensiPage() {
   const [
     todayRes,
     summaryRes,
+    shiftsRes,
     { data: rooms },
     { data: periods },
     { data: rawPlacements },
   ] = await Promise.all([
     getTodayAttendancesAction(),
     getAttendanceSummaryAction(),
+    getWorkShiftsAction(true),
     supabase.from("rooms_units").select("*").eq("is_active", true).order("name"),
     supabase.from("periods").select("*").order("start_date", { ascending: false }),
     supabase
@@ -56,6 +59,7 @@ export default async function PresensiPage() {
       activePlacements={activePlacements}
       rooms={(rooms as RoomUnit[]) || []}
       periods={(periods as Period[]) || []}
+      shifts={shiftsRes.data || []}
     />
   )
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, GraduationCap, Hospital, Calendar, Stethoscope, LayoutGrid, Award } from "lucide-react"
+import { Building2, GraduationCap, Hospital, Calendar, Stethoscope, LayoutGrid, Award, Clock } from "lucide-react"
 
 export function MasterNav() {
   const pathname = usePathname()
@@ -13,6 +13,12 @@ export function MasterNav() {
       href: "/dashboard/master",
       icon: LayoutGrid,
       exact: true,
+    },
+    {
+      title: "Shift & Jam Dinas",
+      href: "/dashboard/master/shift",
+      icon: Clock,
+      exact: false,
     },
     {
       title: "Pimpinan & Diklat",

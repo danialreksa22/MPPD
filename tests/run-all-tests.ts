@@ -9,6 +9,7 @@ import { runAssessmentTests } from "./unit/assessments.test"
 import { runAttendanceTests } from "./unit/attendances.test"
 import { runLetterTests } from "./unit/letters.test"
 import { runPrivacyTests } from "./unit/privacy.test"
+import { runShiftTests } from "./unit/shifts.test"
 
 async function main() {
   const startTime = Date.now()
@@ -26,6 +27,7 @@ async function main() {
     { name: "4. Rasio Presensi & Syarat Kelayakan Ujian", fn: runAttendanceTests },
     { name: "5. Format Penomoran Naskah Dinas & QR Verifikasi", fn: runLetterTests },
     { name: "6. Kepatuhan Privasi UU PDP & Sanitasi XSS", fn: runPrivacyTests },
+    { name: "7. Manajemen Shift & Jam Kerja Mahasiswa Dinas", fn: runShiftTests },
   ]
 
   let passedSuites = 0

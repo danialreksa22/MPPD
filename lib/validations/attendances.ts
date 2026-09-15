@@ -8,6 +8,8 @@ export const checkInSchema = z.object({
     .optional(),
   status: z.enum(["hadir", "izin", "sakit", "alpa"]).default("hadir"),
   notes: z.string().optional().nullable(),
+  shift_id: z.string().optional().nullable(),
+  shift_name: z.string().optional().nullable(),
 })
 
 export const checkOutSchema = z.object({
@@ -33,6 +35,8 @@ export const manualAttendanceSchema = z.object({
   status: z.enum(["hadir", "izin", "sakit", "alpa"]),
   check_in_time: z.string().optional().nullable(),
   check_out_time: z.string().optional().nullable(),
+  shift_id: z.string().optional().nullable(),
+  shift_name: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   is_approved: z.boolean().default(true),
 })

@@ -48,7 +48,9 @@ import {
   Fingerprint,
   Camera,
   Eye,
+  Layers,
 } from "lucide-react"
+import { WorkShift, autoDetectCurrentShift, DEFAULT_SHIFTS } from "@/lib/validations/shifts"
 import { SmartMobileCheckinDialog } from "./smart-mobile-checkin-dialog"
 import {
   Dialog,
@@ -74,6 +76,7 @@ interface AttendanceManagerProps {
   activePlacements: PlacementOption[]
   rooms: RoomUnit[]
   periods: Period[]
+  shifts?: WorkShift[]
 }
 
 export function AttendanceManager({
@@ -82,7 +85,10 @@ export function AttendanceManager({
   activePlacements,
   rooms,
   periods,
+  shifts = DEFAULT_SHIFTS,
 }: AttendanceManagerProps) {
+  const effectiveShifts = shifts && shifts.length > 0 ? shifts : DEFAULT_SHIFTS
+  const detectedShift = autoDetectCurrentShift(effectiveShifts, new Date())
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -93,6 +99,7 @@ export function AttendanceManager({
   const todayStr = new Date().toISOString().split("T")[0]
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [selectedRoomId, setSelectedRoomId] = useState<string>("all")
+  const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [approvalFilter, setApprovalFilter] = useState<string>("all")
 
@@ -111,6 +118,9 @@ export function AttendanceManager({
   // Terminal Self Check-In state
   const [terminalPlacementId, setTerminalPlacementId] = useState<string>(
     activePlacements[0]?.id || ""
+  )
+  const [terminalShiftId, setTerminalShiftId] = useState<string>(
+    detectedShift?.id || effectiveShifts[0]?.id || "shift-pagi"
   )
   const [terminalStatus, setTerminalStatus] = useState<AttendanceStatus>("hadir")
   const [terminalNotes, setTerminalNotes] = useState<string>("")
@@ -158,8 +168,13 @@ export function AttendanceManager({
         : approvalFilter === "approved"
         ? att.is_approved
         : !att.is_approved
+    const matchesShift =
+      selectedShiftFilter === "all"
+        ? true
+        : att.shift_id === selectedShiftFilter ||
+          (att.shift_name && att.shift_name.toLowerCase().includes(selectedShiftFilter.toLowerCase()))
 
-    return matchesSearch && matchesRoom && matchesApproval
+    return matchesSearch && matchesRoom && matchesApproval && matchesShift
   })
 
   // Filter Rekapitulasi
@@ -207,8 +222,13 @@ export function AttendanceManager({
     if (!terminalPlacementId) return
 
     startTransition(async () => {
+      const chosenShift = effectiveShifts.find((s) => s.id === terminalShiftId) || effectiveShifts[0]
       const formData = new FormData()
       formData.set("placement_id", terminalPlacementId)
+      if (chosenShift) {
+        formData.set("shift_id", chosenShift.id)
+        formData.set("shift_name", chosenShift.name)
+      }
       formData.set("date", todayStr)
       formData.set("status", terminalStatus)
       formData.set("notes", terminalNotes)
@@ -410,6 +430,19 @@ export function AttendanceManager({
               </select>
 
               <select
+                value={selectedShiftFilter}
+                onChange={(e) => setSelectedShiftFilter(e.target.value)}
+                className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-hidden"
+              >
+                <option value="all">Semua Shift Dinas</option>
+                {effectiveShifts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
                 value={approvalFilter}
                 onChange={(e) => setApprovalFilter(e.target.value)}
                 className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-hidden"
@@ -430,6 +463,7 @@ export function AttendanceManager({
                     <TableRow className="bg-muted/40 text-xs">
                       <TableHead className="w-[200px]">Mahasiswa</TableHead>
                       <TableHead>Ruangan Dinas</TableHead>
+                      <TableHead className="text-center">Shift Dinas</TableHead>
                       <TableHead className="text-center">Jam Masuk</TableHead>
                       <TableHead className="text-center">Jam Pulang</TableHead>
                       <TableHead className="text-center">Metode &amp; Lokasi</TableHead>
@@ -441,7 +475,7 @@ export function AttendanceManager({
                   <TableBody className="text-xs">
                     {filteredAttendances.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
+                        <TableCell colSpan={9} className="h-28 text-center text-muted-foreground">
                           Belum ada log presensi untuk tanggal terpilih ({selectedDate}).
                         </TableCell>
                       </TableRow>
@@ -466,6 +500,29 @@ export function AttendanceManager({
                               <p className="text-[10px] text-muted-foreground italic mt-0.5">
                                 Catatan: {att.notes}
                               </p>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {att.shift_name ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-semibold bg-primary/10 text-primary border-primary/30"
+                                >
+                                  {att.shift_name}
+                                </Badge>
+                                {att.is_late ? (
+                                  <span className="text-[9px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded px-1.5 py-0.5">
+                                    Terlambat {att.late_minutes ?? 0}m
+                                  </span>
+                                ) : att.check_in_time ? (
+                                  <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
+                                    Tepat Waktu
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">-</span>
                             )}
                           </TableCell>
                           <TableCell className="text-center font-mono text-foreground font-semibold">
@@ -784,6 +841,33 @@ export function AttendanceManager({
                 </select>
               </div>
 
+              {/* Shift Pilihan (Terminal) */}
+              {!terminalTodayAtt && terminalStatus === "hadir" && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-primary" />
+                      Shift Dinas Mahasiswa:
+                    </span>
+                    <span className="text-[10px] text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10">
+                      Auto-Deteksi Jam
+                    </span>
+                  </label>
+                  <select
+                    value={terminalShiftId}
+                    onChange={(e) => setTerminalShiftId(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-hidden"
+                  >
+                    {effectiveShifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.start_time} - {s.end_time})
+                        {s.is_cross_day ? " [Lintas Hari]" : ""} &bull; Toleransi {s.late_tolerance_minutes}m
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Status Pilihan */}
               {!terminalTodayAtt && (
                 <div className="space-y-1.5">
@@ -934,6 +1018,7 @@ export function AttendanceManager({
         onOpenChange={setIsManualOpen}
         activePlacements={activePlacements}
         rooms={rooms}
+        shifts={effectiveShifts}
       />
 
       {/* Modal Dialog Presensi Mobile Cerdas (GPS & Biometrik) */}
@@ -942,6 +1027,7 @@ export function AttendanceManager({
         onOpenChange={setIsMobileCheckinOpen}
         activePlacements={activePlacements}
         defaultPlacementId={terminalPlacementId}
+        shifts={effectiveShifts}
       />
 
       {/* Modal Preview Liveness Selfie */}

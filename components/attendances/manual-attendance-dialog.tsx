@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { RoomUnit } from "@/types"
 import { manualRecordAttendanceAction } from "@/actions/attendances"
 import { AttendanceStatus } from "@/lib/constants"
+import { WorkShift, DEFAULT_SHIFTS } from "@/lib/validations/shifts"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   Loader2,
   User,
+  Layers,
 } from "lucide-react"
 
 interface PlacementOption {
@@ -38,13 +40,16 @@ interface ManualAttendanceDialogProps {
   onOpenChange: (open: boolean) => void
   activePlacements: PlacementOption[]
   rooms?: RoomUnit[]
+  shifts?: WorkShift[]
 }
 
 export function ManualAttendanceDialog({
   open,
   onOpenChange,
   activePlacements,
+  shifts = DEFAULT_SHIFTS,
 }: ManualAttendanceDialogProps) {
+  const effectiveShifts = shifts.length > 0 ? shifts : DEFAULT_SHIFTS
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -53,13 +58,30 @@ export function ManualAttendanceDialog({
   const todayStr = new Date().toISOString().split("T")[0]
 
   const [selectedPlacementId, setSelectedPlacementId] = useState<string>("")
+  const [selectedShiftId, setSelectedShiftId] = useState<string>(
+    effectiveShifts[0]?.id || "shift-pagi"
+  )
   const [date, setDate] = useState<string>(todayStr)
   const [status, setStatus] = useState<AttendanceStatus>("hadir")
-  const [checkInTime, setCheckInTime] = useState<string>("07:30")
-  const [checkOutTime, setCheckOutTime] = useState<string>("14:30")
+  const [checkInTime, setCheckInTime] = useState<string>(
+    effectiveShifts[0]?.start_time || "07:00"
+  )
+  const [checkOutTime, setCheckOutTime] = useState<string>(
+    effectiveShifts[0]?.end_time || "14:00"
+  )
   const [notes, setNotes] = useState<string>("")
 
   const currentPlacement = activePlacements.find((p) => p.id === selectedPlacementId)
+  const currentShift = effectiveShifts.find((s) => s.id === selectedShiftId) || effectiveShifts[0]
+
+  const handleShiftChange = (shiftId: string) => {
+    setSelectedShiftId(shiftId)
+    const found = effectiveShifts.find((s) => s.id === shiftId)
+    if (found) {
+      setCheckInTime(found.start_time)
+      setCheckOutTime(found.end_time)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,6 +102,8 @@ export function ManualAttendanceDialog({
       formData.set("student_id", currentPlacement.student_id)
       formData.set("placement_id", currentPlacement.id)
       formData.set("room_id", currentPlacement.room_id)
+      formData.set("shift_id", currentShift ? currentShift.id : "")
+      formData.set("shift_name", currentShift ? currentShift.name : "")
       formData.set("date", date)
       formData.set("status", status)
       formData.set("check_in_time", status === "hadir" ? checkInTime : "")
@@ -180,6 +204,28 @@ export function ManualAttendanceDialog({
               </select>
             </div>
           </div>
+
+          {/* Shift Dinas (hanya jika hadir) */}
+          {status === "hadir" && (
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Pilih Shift Dinas
+              </label>
+              <select
+                value={selectedShiftId}
+                onChange={(e) => handleShiftChange(e.target.value)}
+                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {effectiveShifts.map((shift) => (
+                  <option key={shift.id} value={shift.id}>
+                    {shift.name} ({shift.start_time} - {shift.end_time})
+                    {shift.is_cross_day ? " [Lintas Hari]" : ""} &bull; Toleransi {shift.late_tolerance_minutes}m
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Jam Masuk & Jam Pulang (hanya jika hadir) */}
           {status === "hadir" && (

@@ -11,6 +11,12 @@ import {
 } from "@/lib/validations/attendances"
 import { AttendanceStatus } from "@/lib/constants"
 import { recordAuditLog } from "@/lib/audit/logger"
+import {
+  calculateShiftLateStatus,
+  autoDetectCurrentShift,
+  WorkShift,
+  DEFAULT_SHIFTS,
+} from "@/lib/validations/shifts"
 
 export interface AttendanceActionResult<T = unknown> {
   success: boolean
@@ -40,6 +46,10 @@ export interface AttendanceWithRelations {
   verification_method?: string | null
   selfie_snapshot?: string | null
   device_info?: string | null
+  shift_id?: string | null
+  shift_name?: string | null
+  is_late?: boolean
+  late_minutes?: number
   students?: {
     id: string
     nim: string
@@ -346,7 +356,35 @@ export async function checkInAction(
 
     const targetDate = validation.data.date || getTodayString()
 
-    // 2. Cek apakah sudah pernah presensi pada hari ini
+    // 2. Resolve Shift & Jam Kerja
+    const shiftId = (formData.get("shift_id") as string) || null
+    let shiftName = (formData.get("shift_name") as string) || null
+
+    let selectedShift: WorkShift | null = null
+    if (shiftId) {
+      const { data: shiftDb } = await supabase.from("work_shifts").select("*").eq("id", shiftId).maybeSingle()
+      selectedShift = shiftDb || DEFAULT_SHIFTS.find((s) => s.id === shiftId) || null
+    }
+
+    if (!selectedShift) {
+      const { data: activeShifts } = await supabase.from("work_shifts").select("*").eq("is_active", true)
+      const shiftsList = (activeShifts && activeShifts.length > 0) ? activeShifts : DEFAULT_SHIFTS
+      selectedShift = autoDetectCurrentShift(shiftsList, new Date())
+    }
+
+    if (selectedShift && !shiftName) {
+      shiftName = selectedShift.name
+    }
+
+    let isLate = false
+    let lateMinutes = 0
+    if (selectedShift && validation.data.status === "hadir") {
+      const lateCheck = calculateShiftLateStatus(selectedShift, new Date())
+      isLate = lateCheck.isLate
+      lateMinutes = lateCheck.lateMinutes
+    }
+
+    // 3. Cek apakah sudah pernah presensi pada hari ini
     const { data: existing } = await supabase
       .from("attendances")
       .select("id, check_in_time")
@@ -362,7 +400,7 @@ export async function checkInAction(
       }
     }
 
-    // 3. Masukkan presensi beserta telemetri geofence & biometrik
+    // 4. Masukkan presensi beserta telemetri geofence, biometrik & shift
     const nowIso = new Date().toISOString()
     const { data: created, error: insertError } = await supabase
       .from("attendances")
@@ -383,6 +421,10 @@ export async function checkInAction(
         verification_method: verificationMethod,
         selfie_snapshot: selfieSnapshot,
         device_info: deviceInfo,
+        shift_id: selectedShift?.id || null,
+        shift_name: shiftName,
+        is_late: isLate,
+        late_minutes: lateMinutes,
       })
       .select("id")
       .single()
@@ -621,6 +663,21 @@ export async function manualRecordAttendanceAction(
       ? new Date(`${validation.data.date}T${validation.data.check_out_time}:00`).toISOString()
       : null
 
+    const shiftId = (formData.get("shift_id") as string) || null
+    const shiftName = (formData.get("shift_name") as string) || null
+    let isLate = false
+    let lateMinutes = 0
+
+    if (shiftId && checkInIso) {
+      const checkInDate = new Date(checkInIso)
+      const shift = DEFAULT_SHIFTS.find((s) => s.id === shiftId)
+      if (shift) {
+        const lateCheck = calculateShiftLateStatus(shift, checkInDate)
+        isLate = lateCheck.isLate
+        lateMinutes = lateCheck.lateMinutes
+      }
+    }
+
     const { data: created, error } = await supabase
       .from("attendances")
       .upsert(
@@ -635,6 +692,10 @@ export async function manualRecordAttendanceAction(
           notes: validation.data.notes || null,
           is_approved: true,
           approved_by_id: user?.id || null,
+          shift_id: shiftId,
+          shift_name: shiftName,
+          is_late: isLate,
+          late_minutes: lateMinutes,
         },
         { onConflict: "student_id,placement_id,date" }
       )

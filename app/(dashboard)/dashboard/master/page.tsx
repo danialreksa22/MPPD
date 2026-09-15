@@ -20,6 +20,7 @@ import {
   Sparkles,
   CheckCircle2,
   Award,
+  Clock,
 } from "lucide-react"
 
 export default async function MasterOverviewPage() {
@@ -33,6 +34,7 @@ export default async function MasterOverviewPage() {
     { count: preceptorCount },
     { count: userCount },
     { count: officialCount },
+    { count: shiftCount },
   ] = await Promise.all([
     supabase.from("institutions").select("*", { count: "exact", head: true }),
     supabase.from("study_programs").select("*", { count: "exact", head: true }),
@@ -41,6 +43,7 @@ export default async function MasterOverviewPage() {
     supabase.from("preceptors").select("*", { count: "exact", head: true }),
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("hospital_officials").select("*", { count: "exact", head: true }),
+    supabase.from("work_shifts").select("*", { count: "exact", head: true }),
   ])
 
   const totalInstitutions = instCount || 0
@@ -50,6 +53,7 @@ export default async function MasterOverviewPage() {
   const totalPreceptors = preceptorCount || 0
   const totalUsers = userCount || 0
   const totalOfficials = (officialCount ?? 0) > 0 ? (officialCount ?? 0) : 3
+  const totalShifts = (shiftCount ?? 0) > 0 ? (shiftCount ?? 0) : 4
 
   const hasData =
     totalInstitutions > 0 ||
@@ -57,7 +61,8 @@ export default async function MasterOverviewPage() {
     totalRooms > 0 ||
     totalPeriods > 0 ||
     totalPreceptors > 0 ||
-    totalOfficials > 0
+    totalOfficials > 0 ||
+    totalShifts > 0
 
   async function handleSeed() {
     "use server"
@@ -267,7 +272,33 @@ export default async function MasterOverviewPage() {
           </CardFooter>
         </Card>
 
-        {/* 7. Akun Pengguna & Hak Akses */}
+        {/* 7. Shift & Jam Dinas */}
+        <Card className="flex flex-col justify-between border-border/80 hover:border-primary/40 transition-all hover:shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
+                <Clock className="h-5 w-5" />
+              </div>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {totalShifts}
+              </span>
+            </div>
+            <CardTitle className="text-base mt-2">Shift &amp; Jam Dinas</CardTitle>
+            <CardDescription className="text-xs">
+              Jadwal shift dinas (Pagi, Siang, Malam/Jaga, Non-Shift) dan toleransi keterlambatan.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="pt-0">
+            <Link href="/dashboard/master/shift" className="w-full">
+              <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                <span>Kelola Shift &amp; Jam Dinas</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        {/* 8. Akun Pengguna & Hak Akses */}
         <Card className="flex flex-col justify-between border-border/80 hover:border-primary/40 transition-all hover:shadow-xs">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
