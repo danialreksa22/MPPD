@@ -10,6 +10,8 @@ import { runAttendanceTests } from "./unit/attendances.test"
 import { runLetterTests } from "./unit/letters.test"
 import { runPrivacyTests } from "./unit/privacy.test"
 import { runShiftTests } from "./unit/shifts.test"
+import { runServiceTypeTests } from "./unit/service-types.test"
+import { runPositionTests } from "./unit/positions.test"
 
 async function main() {
   const startTime = Date.now()
@@ -28,6 +30,8 @@ async function main() {
     { name: "5. Format Penomoran Naskah Dinas & QR Verifikasi", fn: runLetterTests },
     { name: "6. Kepatuhan Privasi UU PDP & Sanitasi XSS", fn: runPrivacyTests },
     { name: "7. Manajemen Shift & Jam Kerja Mahasiswa Dinas", fn: runShiftTests },
+    { name: "8. Master Data Jenis Pelayanan RSUD", fn: runServiceTypeTests },
+    { name: "9. Master Data Jabatan RSUD & Komkordik", fn: runPositionTests },
   ]
 
   let passedSuites = 0

@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   Award,
   Clock,
+  Activity,
+  Briefcase,
 } from "lucide-react"
 
 export default async function MasterOverviewPage() {
@@ -35,6 +37,8 @@ export default async function MasterOverviewPage() {
     { count: userCount },
     { count: officialCount },
     { count: shiftCount },
+    { count: serviceTypeCount },
+    { count: positionCount },
   ] = await Promise.all([
     supabase.from("institutions").select("*", { count: "exact", head: true }),
     supabase.from("study_programs").select("*", { count: "exact", head: true }),
@@ -44,6 +48,8 @@ export default async function MasterOverviewPage() {
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("hospital_officials").select("*", { count: "exact", head: true }),
     supabase.from("work_shifts").select("*", { count: "exact", head: true }),
+    supabase.from("service_types").select("*", { count: "exact", head: true }),
+    supabase.from("job_positions").select("*", { count: "exact", head: true }),
   ])
 
   const totalInstitutions = instCount || 0
@@ -54,6 +60,8 @@ export default async function MasterOverviewPage() {
   const totalUsers = userCount || 0
   const totalOfficials = (officialCount ?? 0) > 0 ? (officialCount ?? 0) : 3
   const totalShifts = (shiftCount ?? 0) > 0 ? (shiftCount ?? 0) : 4
+  const totalServiceTypes = (serviceTypeCount ?? 0) > 0 ? (serviceTypeCount ?? 0) : 7
+  const totalPositions = (positionCount ?? 0) > 0 ? (positionCount ?? 0) : 8
 
   const hasData =
     totalInstitutions > 0 ||
@@ -62,7 +70,9 @@ export default async function MasterOverviewPage() {
     totalPeriods > 0 ||
     totalPreceptors > 0 ||
     totalOfficials > 0 ||
-    totalShifts > 0
+    totalShifts > 0 ||
+    totalServiceTypes > 0 ||
+    totalPositions > 0
 
   async function handleSeed() {
     "use server"
@@ -292,6 +302,58 @@ export default async function MasterOverviewPage() {
             <Link href="/dashboard/master/shift" className="w-full">
               <Button variant="outline" size="sm" className="w-full justify-between text-xs">
                 <span>Kelola Shift &amp; Jam Dinas</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        {/* 8. Jenis Pelayanan */}
+        <Card className="flex flex-col justify-between border-border/80 hover:border-primary/40 transition-all hover:shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                <Activity className="h-5 w-5" />
+              </div>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {totalServiceTypes}
+              </span>
+            </div>
+            <CardTitle className="text-base mt-2">Jenis Pelayanan</CardTitle>
+            <CardDescription className="text-xs">
+              Katalog jenis asuhan medis (Rawat Jalan, Rawat Inap, IGD, Kamar Operasi, ICU, Penunjang).
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="pt-0">
+            <Link href="/dashboard/master/jenis-pelayanan" className="w-full">
+              <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                <span>Kelola Jenis Pelayanan</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        {/* 9. Jabatan Rumah Sakit */}
+        <Card className="flex flex-col justify-between border-border/80 hover:border-primary/40 transition-all hover:shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600">
+                <Briefcase className="h-5 w-5" />
+              </div>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {totalPositions}
+              </span>
+            </div>
+            <CardTitle className="text-base mt-2">Jabatan Rumah Sakit</CardTitle>
+            <CardDescription className="text-xs">
+              Struktur jabatan pimpinan, kepala bidang, kepala ruangan, dan pengelola komkordik/CI.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="pt-0">
+            <Link href="/dashboard/master/jabatan" className="w-full">
+              <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                <span>Kelola Jabatan</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </Link>
