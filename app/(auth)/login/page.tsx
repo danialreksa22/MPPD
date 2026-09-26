@@ -143,12 +143,12 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
+              {/* <p className="text-center text-xs text-muted-foreground">
                 Belum memiliki akun institusi atau mahasiswa?{" "}
                 <Link href="/register" className="text-primary font-medium hover:underline">
                   Daftar Akun
                 </Link>
-              </p>
+              </p> */}
             </CardFooter>
           </form>
         </Card>
