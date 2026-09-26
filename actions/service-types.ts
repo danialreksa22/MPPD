@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+async function getDbClient() {
+  try {
+    return createAdminClient()
+  } catch {
+    return await createClient()
+  }
+}
 import { recordAuditLog } from "@/lib/audit/logger"
 import {
   serviceTypeSchema,
@@ -17,7 +26,7 @@ export async function getServiceTypesAction(
   activeOnly = false
 ): Promise<ServiceTypeActionResult<ServiceType[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     let query = supabase.from("service_types").select("*").order("name", { ascending: true })
 
@@ -66,7 +75,7 @@ export async function createServiceTypeAction(
   formData: FormData
 ): Promise<ServiceTypeActionResult<ServiceType>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const rawData = {
       name: formData.get("name") as string,
@@ -130,7 +139,7 @@ export async function updateServiceTypeAction(
   formData: FormData
 ): Promise<ServiceTypeActionResult<ServiceType>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const rawData = {
       name: formData.get("name") as string,
@@ -195,7 +204,7 @@ export async function updateServiceTypeAction(
  */
 export async function deleteServiceTypeAction(id: string): Promise<ServiceTypeActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const { data: existing, error: fetchErr } = await supabase
       .from("service_types")

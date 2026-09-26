@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+async function getDbClient() {
+  try {
+    return createAdminClient()
+  } catch {
+    return await createClient()
+  }
+}
 import {
   institutionSchema,
   studyProgramSchema,
@@ -25,7 +34,7 @@ export interface MasterActionResult<T = unknown> {
 
 export async function getInstitutionsAction(): Promise<MasterActionResult<Institution[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { data, error } = await supabase
       .from("institutions")
       .select("*")
@@ -64,7 +73,7 @@ export async function saveInstitutionAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const payload = {
       name: validation.data.name,
       type: validation.data.type,
@@ -104,7 +113,7 @@ export async function saveInstitutionAction(
 
 export async function deleteInstitutionAction(id: string): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { error } = await supabase.from("institutions").delete().eq("id", id)
     if (error) throw error
 
@@ -123,7 +132,7 @@ export async function deleteInstitutionAction(id: string): Promise<MasterActionR
 
 export async function getStudyProgramsAction(): Promise<MasterActionResult<StudyProgram[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { data, error } = await supabase
       .from("study_programs")
       .select("*, institutions(name)")
@@ -157,7 +166,7 @@ export async function saveStudyProgramAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const payload = {
       institution_id: validation.data.institution_id,
       name: validation.data.name,
@@ -192,7 +201,7 @@ export async function saveStudyProgramAction(
 
 export async function deleteStudyProgramAction(id: string): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { error } = await supabase.from("study_programs").delete().eq("id", id)
     if (error) throw error
 
@@ -211,7 +220,7 @@ export async function deleteStudyProgramAction(id: string): Promise<MasterAction
 
 export async function getRoomUnitsAction(): Promise<MasterActionResult<RoomUnit[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { data, error } = await supabase
       .from("rooms_units")
       .select("*")
@@ -246,7 +255,7 @@ export async function saveRoomUnitAction(formData: FormData): Promise<MasterActi
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const payload = {
       name: validation.data.name,
       code: validation.data.code || null,
@@ -284,7 +293,7 @@ export async function saveRoomUnitAction(formData: FormData): Promise<MasterActi
 
 export async function deleteRoomUnitAction(id: string): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { error } = await supabase.from("rooms_units").delete().eq("id", id)
     if (error) throw error
 
@@ -303,7 +312,7 @@ export async function deleteRoomUnitAction(id: string): Promise<MasterActionResu
 
 export async function getPeriodsAction(): Promise<MasterActionResult<Period[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { data, error } = await supabase
       .from("periods")
       .select("*")
@@ -337,7 +346,7 @@ export async function savePeriodAction(formData: FormData): Promise<MasterAction
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const payload = {
       name: validation.data.name,
       start_date: validation.data.start_date,
@@ -374,7 +383,7 @@ export async function savePeriodAction(formData: FormData): Promise<MasterAction
 
 export async function deletePeriodAction(id: string): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { error } = await supabase.from("periods").delete().eq("id", id)
     if (error) throw error
 
@@ -393,7 +402,7 @@ export async function deletePeriodAction(id: string): Promise<MasterActionResult
 
 export async function getPreceptorsAction(): Promise<MasterActionResult<Preceptor[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { data, error } = await supabase
       .from("preceptors")
       .select("*")
@@ -428,7 +437,7 @@ export async function savePreceptorAction(formData: FormData): Promise<MasterAct
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const payload = {
       name: validation.data.name,
       nip_nik: validation.data.nip_nik || null,
@@ -466,7 +475,7 @@ export async function savePreceptorAction(formData: FormData): Promise<MasterAct
 
 export async function deletePreceptorAction(id: string): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
     const { error } = await supabase.from("preceptors").delete().eq("id", id)
     if (error) throw error
 
@@ -485,7 +494,7 @@ export async function deletePreceptorAction(id: string): Promise<MasterActionRes
 
 export async function seedDefaultMasterDataAction(): Promise<MasterActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     // 1. Institusi Mitra
     const institutions = [

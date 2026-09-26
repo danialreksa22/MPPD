@@ -653,15 +653,18 @@ export function UserManagementClient({
                           <KeyRound className="h-3.5 w-3.5" />
                         </Button>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenDelete(item)}
-                          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                          title="Hapus Akun Pengguna"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {item.email?.toLowerCase() !== "admin@rsudbulukumba.id" &&
+                          item.id !== "usr-admin-master" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDelete(item)}
+                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                              title="Hapus Akun Pengguna"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>

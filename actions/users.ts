@@ -445,29 +445,79 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
     return { success: false, message: "ID pengguna tidak valid." }
   }
 
+  // Lindungi akun administrator utama dari penghapusan
+  if (
+    userId === "usr-admin-master" ||
+    userId === "2ba9ccd6-3bd4-41e6-88b6-d809954dbe24"
+  ) {
+    return {
+      success: false,
+      message: "Akun Administrator Utama tidak boleh dihapus demi keamanan dan operasional sistem.",
+    }
+  }
+
+  // Validasi format UUID
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)
+  if (!isUuid) {
+    return { success: false, message: "ID pengguna tidak valid atau bukan format UUID." }
+  }
+
   try {
     const adminSupabase = createAdminClient()
 
-    // 1. Ambil data profil untuk dicatat di audit log
+    // 1. Ambil data profil untuk dicatat di audit log & verifikasi email
     const { data: profile } = await adminSupabase
       .from("profiles")
       .select("email, full_name")
       .eq("id", userId)
-      .single()
+      .maybeSingle()
 
-    // 2. Hapus dari user_roles
+    if (profile?.email?.toLowerCase() === "admin@rsudbulukumba.id") {
+      return {
+        success: false,
+        message: "Akun Administrator Utama (admin@rsudbulukumba.id) dilindungi dan tidak dapat dihapus.",
+      }
+    }
+
+    // 2. Lepas relasi foreign key opsional terlebih dahulu agar tidak memblokir penghapusan
+    await adminSupabase
+      .from("rooms_units")
+      .update({ head_of_room_id: null, head_of_room_name: null })
+      .eq("head_of_room_id", userId)
+
+    await adminSupabase
+      .from("preceptors")
+      .update({ user_id: null })
+      .eq("user_id", userId)
+
+    await adminSupabase
+      .from("students")
+      .update({ user_id: null })
+      .eq("user_id", userId)
+
+    // 3. Hapus dari user_roles
     await adminSupabase.from("user_roles").delete().eq("user_id", userId)
 
-    // 3. Hapus dari profiles
-    await adminSupabase.from("profiles").delete().eq("id", userId)
+    // 4. Hapus dari profiles
+    const { error: profileError } = await adminSupabase.from("profiles").delete().eq("id", userId)
+    if (profileError) {
+      if (profileError.code === "23503") {
+        return {
+          success: false,
+          message:
+            "Pengguna ini memiliki riwayat dokumen stase/penilaian/pengajuan resmi rumah sakit sehingga tidak dapat dihapus permanen. Anda dapat mencabut seluruh hak aksesnya melalui menu 'Atur Akses'.",
+        }
+      }
+      throw profileError
+    }
 
-    // 4. Hapus dari Supabase Auth
+    // 5. Hapus dari Supabase Auth
     const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
     if (authError) {
       console.warn("Peringatan saat delete user di auth:", authError.message)
     }
 
-    // 5. Catat audit
+    // 6. Catat audit
     try {
       const regularClient = await createClient()
       const { data: currentAuth } = await regularClient.auth.getUser()
@@ -488,7 +538,7 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
     return {
       success: true,
-      message: `Akun ${profile?.full_name || userId} berhasil dihapus dari sistem.`,
+      message: `Akun ${profile?.full_name || "pengguna"} (${profile?.email || userId}) berhasil dihapus dari sistem.`,
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Gagal menghapus pengguna."

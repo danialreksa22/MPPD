@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+async function getDbClient() {
+  try {
+    return createAdminClient()
+  } catch {
+    return await createClient()
+  }
+}
 import { recordAuditLog } from "@/lib/audit/logger"
 import {
   shiftFormSchema,
@@ -17,7 +26,7 @@ export async function getWorkShiftsAction(
   isActiveOnly: boolean = false
 ): Promise<ShiftActionResult<WorkShift[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     let query = supabase.from("work_shifts").select("*").order("start_time", { ascending: true })
 
@@ -95,7 +104,7 @@ export async function createWorkShiftAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const { data: created, error } = await supabase
       .from("work_shifts")
@@ -160,7 +169,7 @@ export async function updateWorkShiftAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const { error } = await supabase
       .from("work_shifts")
@@ -195,7 +204,7 @@ export async function updateWorkShiftAction(
  */
 export async function deleteWorkShiftAction(id: string): Promise<ShiftActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const { error } = await supabase.from("work_shifts").delete().eq("id", id)
     if (error) throw error

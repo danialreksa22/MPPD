@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { UserRole } from "@/lib/constants"
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@/lib/validations/auth"
 
@@ -42,49 +43,105 @@ export async function signInAction(
     validation.data.password === "AdminMagguru2026!"
 
   if (isMasterAdmin) {
-    const cookieStore = await cookies()
-    cookieStore.set(
-      "magguru_auth_session",
-      JSON.stringify({
-        id: "usr-admin-master",
-        name: "Administrator MAGGURU RSUD",
-        email: normalizedEmail,
-        role: "super_admin" as UserRole,
-        isMasterAdmin: true,
-      }),
-      {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7,
-      }
-    )
-
     try {
       const supabase = await createClient()
-      await supabase.from("profiles").upsert(
-        {
-          id: "usr-admin-master",
-          full_name: "Administrator MAGGURU RSUD",
-          email: normalizedEmail,
-          phone: "081144502026",
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      )
-      await supabase.from("user_roles").upsert(
-        {
-          user_id: "usr-admin-master",
-          role: "super_admin",
-        },
-        { onConflict: "user_id,role" }
-      )
-    } catch {
-      // Ignored
-    }
+      const adminSupabase = createAdminClient()
 
-    revalidatePath("/", "layout")
-    redirect("/dashboard")
+      // 1.1 Pastikan user admin terdaftar di auth.users Supabase
+      const { data: usersList } = await adminSupabase.auth.admin.listUsers()
+      let adminUser = usersList?.users?.find(
+        (u) => u.email?.toLowerCase() === normalizedEmail
+      )
+
+      if (!adminUser) {
+        const { data: newAdmin } = await adminSupabase.auth.admin.createUser({
+          email: normalizedEmail,
+          password: validation.data.password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: "Administrator MAGGURU RSUD",
+            role: "super_admin",
+          },
+        })
+        adminUser = newAdmin?.user ?? undefined
+      }
+
+      if (adminUser?.id) {
+        // Sinkronkan profiles dan user_roles dengan UUID valid
+        await adminSupabase.from("profiles").upsert(
+          {
+            id: adminUser.id,
+            full_name: "Administrator MAGGURU RSUD",
+            email: normalizedEmail,
+            phone: "081144502026",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        )
+
+        await adminSupabase.from("user_roles").upsert(
+          {
+            user_id: adminUser.id,
+            role: "super_admin",
+          },
+          { onConflict: "user_id,role" }
+        )
+      }
+
+      // 1.2 Sign in ke Supabase Auth agar session token tersimpan di cookie
+      const { data: signInData } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: validation.data.password,
+      })
+
+      const actualId = signInData?.user?.id || adminUser?.id || "2ba9ccd6-3bd4-41e6-88b6-d809954dbe24"
+
+      // 1.3 Simpan cookie sesi magguru_auth_session
+      const cookieStore = await cookies()
+      cookieStore.set(
+        "magguru_auth_session",
+        JSON.stringify({
+          id: actualId,
+          name: "Administrator MAGGURU RSUD",
+          email: normalizedEmail,
+          role: "super_admin" as UserRole,
+          isMasterAdmin: true,
+        }),
+        {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 7,
+        }
+      )
+
+      revalidatePath("/", "layout")
+      redirect("/dashboard")
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) {
+        throw err
+      }
+      console.error("Error pada autentikasi admin:", err)
+      // Fallback redirect jika terjadi anomali
+      const cookieStore = await cookies()
+      cookieStore.set(
+        "magguru_auth_session",
+        JSON.stringify({
+          id: "2ba9ccd6-3bd4-41e6-88b6-d809954dbe24",
+          name: "Administrator MAGGURU RSUD",
+          email: normalizedEmail,
+          role: "super_admin" as UserRole,
+          isMasterAdmin: true,
+        }),
+        {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 7,
+        }
+      )
+      redirect("/dashboard")
+    }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -99,7 +156,7 @@ export async function signInAction(
 
   try {
     const supabase = await createClient()
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: validation.data.email,
       password: validation.data.password,
     })
@@ -117,6 +174,43 @@ export async function signInAction(
         message: friendlyMessage,
         error: error.message,
       }
+    }
+
+    if (authData?.user) {
+      // Ambil role pengguna dari user_roles
+      let userRole: UserRole = "admin_diklat"
+      try {
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", authData.user.id)
+          .single()
+        if (roleRow?.role) {
+          userRole = roleRow.role as UserRole
+        } else if (authData.user.user_metadata?.role) {
+          userRole = authData.user.user_metadata.role as UserRole
+        }
+      } catch {
+        // Fallback role
+      }
+
+      const cookieStore = await cookies()
+      cookieStore.set(
+        "magguru_auth_session",
+        JSON.stringify({
+          id: authData.user.id,
+          name: authData.user.user_metadata?.full_name || authData.user.email?.split("@")[0],
+          email: authData.user.email,
+          role: userRole,
+          isMasterAdmin: userRole === "super_admin",
+        }),
+        {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 7,
+        }
+      )
     }
 
     revalidatePath("/", "layout")

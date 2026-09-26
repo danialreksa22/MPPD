@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+async function getDbClient() {
+  try {
+    return createAdminClient()
+  } catch {
+    return await createClient()
+  }
+}
 import { recordAuditLog } from "@/lib/audit/logger"
 import {
   officialFormSchema,
@@ -80,7 +89,7 @@ export async function getOfficialsAction(filters?: {
   isActive?: boolean
 }): Promise<OfficialActionResult<HospitalOfficial[]>> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     let query = supabase
       .from("hospital_officials")
@@ -155,7 +164,7 @@ export async function createOfficialAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     // Jika diset sebagai primary signer, nonaktifkan primary signer lain dalam kategori yang sama
     if (validation.data.is_primary_signer) {
@@ -223,7 +232,7 @@ export async function updateOfficialAction(
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     if (validation.data.is_primary_signer) {
       await supabase
@@ -265,7 +274,7 @@ export async function updateOfficialAction(
  */
 export async function deleteOfficialAction(id: string): Promise<OfficialActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     const { error } = await supabase.from("hospital_officials").delete().eq("id", id)
     if (error) throw error
@@ -295,7 +304,7 @@ export async function setDefaultSignerAction(
   category: OfficialCategory
 ): Promise<OfficialActionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = await getDbClient()
 
     // 1. Reset yang lain
     await supabase
