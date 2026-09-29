@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import { createClient } from "@/lib/supabase/server"
 import {
   getPlacementsAction,
@@ -7,6 +10,14 @@ import { PlacementManager } from "@/components/placements/placement-manager"
 import { RoomUnit, Preceptor, Period } from "@/types"
 
 export default async function PenempatanPage() {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+  if (user.role === USER_ROLES.MAHASISWA) {
+    redirect("/dashboard")
+  }
+
   const supabase = await createClient()
 
   const [

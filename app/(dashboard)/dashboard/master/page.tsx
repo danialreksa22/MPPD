@@ -1,4 +1,7 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import { createClient } from "@/lib/supabase/server"
 import { seedDefaultMasterDataAction } from "@/actions/master-data"
 import { Button } from "@/components/ui/button"
@@ -26,6 +29,14 @@ import {
 } from "lucide-react"
 
 export default async function MasterOverviewPage() {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+  if (user.role !== USER_ROLES.SUPER_ADMIN && user.role !== USER_ROLES.ADMIN_DIKLAT) {
+    redirect("/dashboard")
+  }
+
   const supabase = await createClient()
 
   const [

@@ -177,21 +177,39 @@ export async function signInAction(
     }
 
     if (authData?.user) {
-      // Ambil role pengguna dari user_roles
-      let userRole: UserRole = "admin_diklat"
+      // Ambil role dan profil pengguna langsung dari database menggunakan admin client
+      let userRole: UserRole = "mahasiswa"
+      let fullName: string =
+        authData.user.user_metadata?.full_name || authData.user.email?.split("@")[0] || "Pengguna"
+
       try {
-        const { data: roleRow } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", authData.user.id)
-          .single()
-        if (roleRow?.role) {
-          userRole = roleRow.role as UserRole
+        const adminSupabase = createAdminClient()
+        const [roleRes, profileRes] = await Promise.all([
+          adminSupabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", authData.user.id)
+            .maybeSingle(),
+          adminSupabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", authData.user.id)
+            .maybeSingle(),
+        ])
+
+        if (roleRes.data?.role) {
+          userRole = roleRes.data.role as UserRole
         } else if (authData.user.user_metadata?.role) {
           userRole = authData.user.user_metadata.role as UserRole
         }
+
+        if (profileRes.data?.full_name) {
+          fullName = profileRes.data.full_name
+        }
       } catch {
-        // Fallback role
+        if (authData.user.user_metadata?.role) {
+          userRole = authData.user.user_metadata.role as UserRole
+        }
       }
 
       const cookieStore = await cookies()
@@ -199,7 +217,7 @@ export async function signInAction(
         "magguru_auth_session",
         JSON.stringify({
           id: authData.user.id,
-          name: authData.user.user_metadata?.full_name || authData.user.email?.split("@")[0],
+          name: fullName,
           email: authData.user.email,
           role: userRole,
           isMasterAdmin: userRole === "super_admin",

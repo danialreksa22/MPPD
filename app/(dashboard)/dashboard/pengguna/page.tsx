@@ -1,4 +1,7 @@
 import { Metadata } from "next"
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import { createClient } from "@/lib/supabase/server"
 import { getUsersAction } from "@/actions/users"
 import { UserManagementClient } from "@/components/users/user-management-client"
@@ -13,6 +16,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function UserManagementPage() {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+  if (user.role !== USER_ROLES.SUPER_ADMIN && user.role !== USER_ROLES.ADMIN_DIKLAT) {
+    redirect("/dashboard")
+  }
+
   const supabase = await createClient()
 
   const [usersRes, { data: institutions }, { data: rooms }] = await Promise.all([

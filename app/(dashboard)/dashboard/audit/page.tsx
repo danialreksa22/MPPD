@@ -1,4 +1,7 @@
 import { Metadata } from "next"
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import { getAuditLogsAction } from "@/actions/audit"
 import { AuditTrailManager } from "@/components/audit/audit-trail-manager"
 import { ShieldAlert, FileText, CheckCircle } from "lucide-react"
@@ -12,6 +15,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function AuditTrailPage() {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+  if (user.role !== USER_ROLES.SUPER_ADMIN && user.role !== USER_ROLES.DIREKTUR) {
+    redirect("/dashboard")
+  }
+
   const auditRes = await getAuditLogsAction({ limit: 150 })
   const logs = auditRes.data || []
 

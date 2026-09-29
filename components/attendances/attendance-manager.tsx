@@ -77,6 +77,7 @@ interface AttendanceManagerProps {
   rooms: RoomUnit[]
   periods: Period[]
   shifts?: WorkShift[]
+  isStudent?: boolean
 }
 
 export function AttendanceManager({
@@ -86,6 +87,7 @@ export function AttendanceManager({
   rooms,
   periods,
   shifts = DEFAULT_SHIFTS,
+  isStudent = false,
 }: AttendanceManagerProps) {
   const effectiveShifts = shifts && shifts.length > 0 ? shifts : DEFAULT_SHIFTS
   const detectedShift = autoDetectCurrentShift(effectiveShifts, new Date())
@@ -296,7 +298,7 @@ export function AttendanceManager({
         </div>
 
         <div className="flex items-center gap-2">
-          {pendingAttendances.length > 0 && (
+          {pendingAttendances.length > 0 && !isStudent && (
             <Button
               size="sm"
               variant="outline"
@@ -322,14 +324,16 @@ export function AttendanceManager({
             <span>Presensi Mobile (GPS &amp; Biometrik)</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={() => setIsManualOpen(true)}
-            className="text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Catat Manual / Izin</span>
-          </Button>
+          {!isStudent && (
+            <Button
+              size="sm"
+              onClick={() => setIsManualOpen(true)}
+              className="text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Catat Manual / Izin</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -379,18 +383,20 @@ export function AttendanceManager({
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("terminal")}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-            activeTab === "terminal"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          }`}
-        >
-          <Smartphone className="h-3.5 w-3.5" />
-          <span>Terminal Presensi Digital</span>
-        </button>
+        {!isStudent && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("terminal")}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === "terminal"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+            <span>Terminal Presensi Digital</span>
+          </button>
+        )}
       </div>
 
       {/* TAB 1: PRESENSI HARI INI & PERSATUJUAN */}
@@ -469,13 +475,13 @@ export function AttendanceManager({
                       <TableHead className="text-center">Metode &amp; Lokasi</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-center">Approval</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
+                      {!isStudent && <TableHead className="text-right">Aksi</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody className="text-xs">
                     {filteredAttendances.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="h-28 text-center text-muted-foreground">
+                        <TableCell colSpan={isStudent ? 8 : 9} className="h-28 text-center text-muted-foreground">
                           Belum ada log presensi untuk tanggal terpilih ({selectedDate}).
                         </TableCell>
                       </TableRow>
@@ -606,33 +612,35 @@ export function AttendanceManager({
                               {att.is_approved ? "Disetujui" : "Menunggu Review"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {!att.is_approved ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleApprove(att.id, true)}
-                                  disabled={isPending}
-                                  className="h-7 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                                  title="Setujui Kehadiran"
-                                >
-                                  <ShieldCheck className="h-3 w-3 mr-1" />
-                                  Setujui
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleApprove(att.id, false)}
-                                  disabled={isPending}
-                                  className="h-7 px-2 text-[10px] text-muted-foreground"
-                                  title="Batalkan Persetujuan"
-                                >
-                                  Batal
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                          {!isStudent && (
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {!att.is_approved ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApprove(att.id, true)}
+                                    disabled={isPending}
+                                    className="h-7 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    title="Setujui Kehadiran"
+                                  >
+                                    <ShieldCheck className="h-3 w-3 mr-1" />
+                                    Setujui
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApprove(att.id, false)}
+                                    disabled={isPending}
+                                    className="h-7 px-2 text-[10px] text-muted-foreground"
+                                    title="Batalkan Persetujuan"
+                                  >
+                                    Batal
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
@@ -1012,14 +1020,16 @@ export function AttendanceManager({
         </div>
       )}
 
-      {/* Modal Dialog Presensi Manual */}
-      <ManualAttendanceDialog
-        open={isManualOpen}
-        onOpenChange={setIsManualOpen}
-        activePlacements={activePlacements}
-        rooms={rooms}
-        shifts={effectiveShifts}
-      />
+      {/* Modal Dialog Presensi Manual (Hanya untuk Admin/CI/DPJP) */}
+      {!isStudent && (
+        <ManualAttendanceDialog
+          open={isManualOpen}
+          onOpenChange={setIsManualOpen}
+          activePlacements={activePlacements}
+          rooms={rooms}
+          shifts={effectiveShifts}
+        />
+      )}
 
       {/* Modal Dialog Presensi Mobile Cerdas (GPS & Biometrik) */}
       <SmartMobileCheckinDialog

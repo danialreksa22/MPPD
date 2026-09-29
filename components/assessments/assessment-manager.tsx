@@ -55,6 +55,7 @@ interface AssessmentManagerProps {
   eligiblePlacements: EligiblePlacementItem[]
   rooms: RoomUnit[]
   studyPrograms: StudyProgram[]
+  isStudent?: boolean
 }
 
 export function AssessmentManager({
@@ -62,6 +63,7 @@ export function AssessmentManager({
   eligiblePlacements,
   rooms,
   studyPrograms,
+  isStudent = false,
 }: AssessmentManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -240,14 +242,16 @@ export function AssessmentManager({
             <span>Ekspor Excel (.xlsx)</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={() => handleOpenNewForm()}
-            className="text-xs gap-1.5 shadow-sm font-semibold"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Input Nilai Klinik</span>
-          </Button>
+          {!isStudent && (
+            <Button
+              size="sm"
+              onClick={() => handleOpenNewForm()}
+              className="text-xs gap-1.5 shadow-sm font-semibold"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Input Nilai Klinik</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -301,15 +305,15 @@ export function AssessmentManager({
         <Card className="border-border/80">
           <CardHeader className="p-4 pb-1">
             <CardDescription className="text-xs flex items-center justify-between">
-              <span>Menunggu Penilaian</span>
+              <span>{isStudent ? "Status Verifikasi" : "Menunggu Penilaian"}</span>
               <Clock className="h-4 w-4 text-amber-600" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold font-heading text-amber-700 dark:text-amber-400 mt-1">
-              {pendingGradingCount}
+              {isStudent ? (finalizedCount > 0 ? "Final" : "Draf") : pendingGradingCount}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-1 text-[11px] text-muted-foreground">
-            Mahasiswa stase aktif / draf
+            {isStudent ? "Status nilai stase resmi" : "Mahasiswa stase aktif / draf"}
           </CardContent>
         </Card>
       </div>
@@ -336,15 +340,17 @@ export function AssessmentManager({
           <span>Distribusi Huruf Mutu</span>
         </Button>
 
-        <Button
-          size="sm"
-          variant={activeTab === "queue" ? "default" : "ghost"}
-          onClick={() => setActiveTab("queue")}
-          className="text-xs gap-1.5 font-medium"
-        >
-          <Users className="h-4 w-4" />
-          <span>Antrean Siap Dinilai ({pendingGradingCount})</span>
-        </Button>
+        {!isStudent && (
+          <Button
+            size="sm"
+            variant={activeTab === "queue" ? "default" : "ghost"}
+            onClick={() => setActiveTab("queue")}
+            className="text-xs gap-1.5 font-medium"
+          >
+            <Users className="h-4 w-4" />
+            <span>Antrean Siap Dinilai ({pendingGradingCount})</span>
+          </Button>
+        )}
       </div>
 
       {/* TAB 1: DAFTAR PENILAIAN STASE */}
@@ -501,54 +507,59 @@ export function AssessmentManager({
 
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Cetak Lembar Evaluasi */}
+                          {/* Cetak / Lihat Lembar Evaluasi */}
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handlePrint(a)}
-                            title="Cetak Lembar Evaluasi Resmi"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            title="Lihat / Cetak Lembar Evaluasi Resmi"
+                            className="h-7 px-2 text-xs gap-1 text-primary hover:bg-primary/10"
                           >
                             <Printer className="h-3.5 w-3.5" />
+                            {isStudent && <span>Lembar Nilai</span>}
                           </Button>
 
-                          {/* Edit Nilai */}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEdit(a)}
-                            title={a.is_finalized ? "Lihat Rincian Nilai" : "Edit Nilai"}
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
+                          {!isStudent && (
+                            <>
+                              {/* Edit Nilai */}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEdit(a)}
+                                title={a.is_finalized ? "Lihat Rincian Nilai" : "Edit Nilai"}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
 
-                          {/* Kunci Nilai jika masih Draf */}
-                          {!a.is_finalized && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleFinalize(a.id)}
-                              disabled={isPending}
-                              title="Kunci & Finalisasi Nilai"
-                              className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                              {/* Kunci Nilai jika masih Draf */}
+                              {!a.is_finalized && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleFinalize(a.id)}
+                                  disabled={isPending}
+                                  title="Kunci & Finalisasi Nilai"
+                                  className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                                >
+                                  <Lock className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
 
-                          {/* Hapus Draf */}
-                          {!a.is_finalized && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDelete(a.id)}
-                              disabled={isPending}
-                              title="Hapus Draf Penilaian"
-                              className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                              {/* Hapus Draf */}
+                              {!a.is_finalized && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDelete(a.id)}
+                                  disabled={isPending}
+                                  title="Hapus Draf Penilaian"
+                                  className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -712,14 +723,16 @@ export function AssessmentManager({
         </div>
       )}
 
-      {/* Modal Dialog Form Penilaian */}
-      <AssessmentFormDialog
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        eligiblePlacements={eligiblePlacements}
-        editingAssessment={selectedAssessmentToEdit}
-        initialPlacementId={initialPlacementId}
-      />
+      {/* Modal Dialog Form Penilaian (Hanya untuk CI/Dosen/Admin) */}
+      {!isStudent && (
+        <AssessmentFormDialog
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          eligiblePlacements={eligiblePlacements}
+          editingAssessment={selectedAssessmentToEdit}
+          initialPlacementId={initialPlacementId}
+        />
+      )}
 
       {/* Modal Dialog Cetak Lembar Evaluasi */}
       <EvaluationSheetDialog

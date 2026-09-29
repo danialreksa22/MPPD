@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/auth"
 import {
   checkInSchema,
   checkOutSchema,
@@ -9,7 +10,7 @@ import {
   bulkApproveAttendanceSchema,
   manualAttendanceSchema,
 } from "@/lib/validations/attendances"
-import { AttendanceStatus } from "@/lib/constants"
+import { AttendanceStatus, USER_ROLES } from "@/lib/constants"
 import { recordAuditLog } from "@/lib/audit/logger"
 import {
   calculateShiftLateStatus,
@@ -535,6 +536,14 @@ export async function approveAttendanceAction(
   }
 
   try {
+    const currentUser = await getCurrentUser()
+    if (currentUser?.role === USER_ROLES.MAHASISWA) {
+      return {
+        success: false,
+        message: "Akses ditolak: Mahasiswa tidak memiliki izin untuk menyetujui presensi.",
+      }
+    }
+
     const supabase = await createClient()
     const {
       data: { user },
@@ -586,6 +595,14 @@ export async function bulkApproveAttendancesAction(
   }
 
   try {
+    const currentUser = await getCurrentUser()
+    if (currentUser?.role === USER_ROLES.MAHASISWA) {
+      return {
+        success: false,
+        message: "Akses ditolak: Mahasiswa tidak memiliki izin untuk menyetujui presensi massal.",
+      }
+    }
+
     const supabase = await createClient()
     const {
       data: { user },
@@ -651,6 +668,15 @@ export async function manualRecordAttendanceAction(
   }
 
   try {
+    const currentUser = await getCurrentUser()
+    if (currentUser?.role === USER_ROLES.MAHASISWA) {
+      return {
+        success: false,
+        message:
+          "Akses ditolak: Mahasiswa tidak diizinkan menginput presensi secara manual. Silakan gunakan Presensi Mobile berbasis GPS.",
+      }
+    }
+
     const supabase = await createClient()
     const {
       data: { user },

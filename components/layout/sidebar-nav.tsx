@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { APP_CONFIG, UserRole, ROLE_LABELS } from "@/lib/constants"
+import { APP_CONFIG, UserRole, ROLE_LABELS, USER_ROLES } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { signOutAction } from "@/actions/auth"
@@ -25,15 +25,18 @@ import {
   ShieldAlert,
 } from "lucide-react"
 
+export interface NavItem {
+  title: string
+  href: string
+  icon: React.ElementType
+  badge?: string
+  colorClass?: string
+  roles: UserRole[]
+}
+
 export interface NavGroup {
   label: string
-  items: {
-    title: string
-    href: string
-    icon: React.ElementType
-    badge?: string
-    colorClass?: string
-  }[]
+  items: NavItem[]
 }
 
 export const NAVIGATION_GROUPS: NavGroup[] = [
@@ -44,6 +47,16 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
         title: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.KEPALA_RUANGAN,
+          USER_ROLES.PRESEPTOR,
+          USER_ROLES.SUPERVISOR_DOKTER,
+          USER_ROLES.PIC_INSTITUSI,
+          USER_ROLES.MAHASISWA,
+          USER_ROLES.DIREKTUR,
+        ],
       },
     ],
   },
@@ -54,16 +67,23 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
         title: "Master Data Diklat",
         href: "/dashboard/master",
         icon: Database,
+        roles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN_DIKLAT],
       },
       {
         title: "Manajemen Pengguna",
         href: "/dashboard/pengguna",
         icon: Users,
+        roles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN_DIKLAT],
       },
       {
         title: "Pengajuan Mahasiswa",
         href: "/dashboard/pengajuan",
         icon: FileText,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.PIC_INSTITUSI,
+        ],
       },
     ],
   },
@@ -74,16 +94,40 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
         title: "Penempatan & Rotasi",
         href: "/dashboard/penempatan",
         icon: Calendar,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.KEPALA_RUANGAN,
+          USER_ROLES.PRESEPTOR,
+          USER_ROLES.SUPERVISOR_DOKTER,
+          USER_ROLES.PIC_INSTITUSI,
+          USER_ROLES.DIREKTUR,
+        ],
       },
       {
         title: "Presensi Digital",
         href: "/dashboard/presensi",
         icon: CheckCircle2,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.KEPALA_RUANGAN,
+          USER_ROLES.PRESEPTOR,
+          USER_ROLES.SUPERVISOR_DOKTER,
+          USER_ROLES.MAHASISWA,
+        ],
       },
       {
         title: "Penilaian Klinik",
         href: "/dashboard/penilaian",
         icon: Stethoscope,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.PRESEPTOR,
+          USER_ROLES.SUPERVISOR_DOKTER,
+          USER_ROLES.MAHASISWA,
+        ],
       },
     ],
   },
@@ -94,22 +138,44 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
         title: "Surat & Dokumen",
         href: "/dashboard/surat",
         icon: FileCheck,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.PIC_INSTITUSI,
+          USER_ROLES.DIREKTUR,
+        ],
       },
       {
         title: "Laporan Pendidikan",
         href: "/dashboard/laporan",
         icon: BarChart3,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.DIREKTUR,
+          USER_ROLES.PIC_INSTITUSI,
+        ],
       },
       {
         title: "Pusat Notifikasi",
         href: "/dashboard/notifikasi",
         icon: Bell,
+        roles: [
+          USER_ROLES.SUPER_ADMIN,
+          USER_ROLES.ADMIN_DIKLAT,
+          USER_ROLES.KEPALA_RUANGAN,
+          USER_ROLES.PRESEPTOR,
+          USER_ROLES.SUPERVISOR_DOKTER,
+          USER_ROLES.PIC_INSTITUSI,
+          USER_ROLES.DIREKTUR,
+        ],
       },
       {
         title: "Audit Trail & Keamanan",
         href: "/dashboard/audit",
         icon: ShieldAlert,
         badge: "Anti-Tamper",
+        roles: [USER_ROLES.SUPER_ADMIN, USER_ROLES.DIREKTUR],
       },
     ],
   },
@@ -127,6 +193,15 @@ interface SidebarNavProps {
 
 export function SidebarNav({ userProfile, onItemClick }: SidebarNavProps) {
   const pathname = usePathname()
+  const currentRole = userProfile?.role || USER_ROLES.MAHASISWA
+
+  // Filter navigasi berdasarkan hak akses peran (Role-Based Access Control)
+  const visibleGroups = React.useMemo(() => {
+    return NAVIGATION_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.roles.includes(currentRole)),
+    })).filter((group) => group.items.length > 0)
+  }, [currentRole])
 
   return (
     <aside className="flex h-full flex-col justify-between border-r border-border/80 bg-sidebar text-sidebar-foreground">
@@ -164,9 +239,9 @@ export function SidebarNav({ userProfile, onItemClick }: SidebarNavProps) {
         </Link>
       </div>
 
-      {/* 2. NAVIGATION MENU ITEMS */}
+      {/* 2. NAVIGATION MENU ITEMS BERBASIS PERAN (RBAC) */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-        {NAVIGATION_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="space-y-1">
             <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
               {group.label}

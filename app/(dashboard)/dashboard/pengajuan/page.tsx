@@ -1,10 +1,21 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import { createClient } from "@/lib/supabase/server"
 import { ApplicationList, ApplicationItem } from "@/components/applications/application-list"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
 export default async function PengajuanPage() {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+  if (user.role === USER_ROLES.MAHASISWA) {
+    redirect("/dashboard")
+  }
+
   const supabase = await createClient()
 
   const { data: applications } = await supabase

@@ -12,6 +12,7 @@ import { runPrivacyTests } from "./unit/privacy.test"
 import { runShiftTests } from "./unit/shifts.test"
 import { runServiceTypeTests } from "./unit/service-types.test"
 import { runPositionTests } from "./unit/positions.test"
+import { runStudentPermissionTests } from "./unit/student-permissions.test"
 
 async function main() {
   const startTime = Date.now()
@@ -32,6 +33,7 @@ async function main() {
     { name: "7. Manajemen Shift & Jam Kerja Mahasiswa Dinas", fn: runShiftTests },
     { name: "8. Master Data Jenis Pelayanan RSUD", fn: runServiceTypeTests },
     { name: "9. Master Data Jabatan RSUD & Komkordik", fn: runPositionTests },
+    { name: "10. Hak Akses Mahasiswa (Presensi Mobile & Read-Only Nilai)", fn: runStudentPermissionTests },
   ]
 
   let passedSuites = 0

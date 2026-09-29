@@ -11,7 +11,9 @@ import {
 import {
   calculateFinalScore,
   calculateGradeLetter,
+  USER_ROLES,
 } from "@/lib/constants"
+import { getCurrentUser } from "@/lib/auth"
 import { recordAuditLog } from "@/lib/audit/logger"
 
 export interface AssessmentActionResult<T = unknown> {
@@ -273,6 +275,14 @@ export async function saveAssessmentAction(
     return { success: false, message: firstError }
   }
 
+  const currentUser = await getCurrentUser()
+  if (currentUser?.role === USER_ROLES.MAHASISWA) {
+    return {
+      success: false,
+      message: "Akses ditolak: Mahasiswa tidak memiliki izin untuk menginput atau mengubah nilai klinik.",
+    }
+  }
+
   const {
     id,
     placement_id,
@@ -443,6 +453,14 @@ export async function finalizeAssessmentAction(
   }
 
   try {
+    const currentUser = await getCurrentUser()
+    if (currentUser?.role === USER_ROLES.MAHASISWA) {
+      return {
+        success: false,
+        message: "Akses ditolak: Mahasiswa tidak memiliki izin untuk memfinalisasi nilai klinik.",
+      }
+    }
+
     const supabase = await createClient()
 
     // Ambil data placement_id
@@ -507,6 +525,14 @@ export async function deleteAssessmentAction(
   assessmentId: string
 ): Promise<AssessmentActionResult> {
   try {
+    const currentUser = await getCurrentUser()
+    if (currentUser?.role === USER_ROLES.MAHASISWA) {
+      return {
+        success: false,
+        message: "Akses ditolak: Mahasiswa tidak memiliki izin untuk menghapus nilai klinik.",
+      }
+    }
+
     const supabase = await createClient()
 
     // 1. Cek apakah sudah final

@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/auth"
+import { USER_ROLES } from "@/lib/constants"
 import {
   getTodayAttendancesAction,
   getAttendanceSummaryAction,
@@ -9,6 +11,8 @@ import { RoomUnit, Period } from "@/types"
 
 export default async function PresensiPage() {
   const supabase = await createClient()
+  const currentUser = await getCurrentUser()
+  const isStudent = currentUser?.role === USER_ROLES.MAHASISWA
 
   const [
     todayRes,
@@ -38,7 +42,17 @@ export default async function PresensiPage() {
       .in("status", ["active", "scheduled"]),
   ])
 
-  const activePlacements = (rawPlacements || []).map((p) => {
+  let studentId: string | null = null
+  if (isStudent && currentUser) {
+    const { data: student } = await supabase
+      .from("students")
+      .select("id")
+      .or(`user_id.eq.${currentUser.id},email.eq.${currentUser.email}`)
+      .maybeSingle()
+    studentId = student?.id || currentUser.id
+  }
+
+  const allPlacements = (rawPlacements || []).map((p) => {
     const student = p.students as unknown as { nim: string; full_name: string } | null
     const room = p.rooms_units as unknown as { name: string } | null
     return {
@@ -52,14 +66,28 @@ export default async function PresensiPage() {
     }
   })
 
+  const activePlacements = isStudent && studentId
+    ? allPlacements.filter((p) => p.student_id === studentId)
+    : allPlacements
+
+  const initialAttendances = isStudent && studentId
+    ? (todayRes.data || []).filter((a) => a.student_id === studentId)
+    : todayRes.data || []
+
+  const summaryData = isStudent && studentId
+    ? (summaryRes.data || []).filter((s) => s.student_id === studentId)
+    : summaryRes.data || []
+
   return (
     <AttendanceManager
-      initialAttendances={todayRes.data || []}
-      summaryData={summaryRes.data || []}
+      initialAttendances={initialAttendances}
+      summaryData={summaryData}
       activePlacements={activePlacements}
       rooms={(rooms as RoomUnit[]) || []}
       periods={(periods as Period[]) || []}
       shifts={shiftsRes.data || []}
+      isStudent={isStudent}
     />
   )
 }
+
