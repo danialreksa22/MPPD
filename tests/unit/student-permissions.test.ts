@@ -18,7 +18,7 @@ export async function runStudentPermissionTests() {
   const attendancePermissions = {
     [USER_ROLES.SUPER_ADMIN]: { canManual: true, canApprove: true, canMobileGPS: true },
     [USER_ROLES.ADMIN_DIKLAT]: { canManual: true, canApprove: true, canMobileGPS: true },
-    [USER_ROLES.PEMBIMBING_KLINIK]: { canManual: true, canApprove: true, canMobileGPS: true },
+    [USER_ROLES.PRESEPTOR]: { canManual: true, canApprove: true, canMobileGPS: true },
     [USER_ROLES.KEPALA_RUANGAN]: { canManual: true, canApprove: true, canMobileGPS: true },
     [USER_ROLES.MAHASISWA]: { canManual: false, canApprove: false, canMobileGPS: true },
   }
@@ -38,7 +38,7 @@ export async function runStudentPermissionTests() {
   const assessmentPermissions = {
     [USER_ROLES.SUPER_ADMIN]: { canInput: true, canFinalize: true, canDelete: true, canViewSelf: true },
     [USER_ROLES.ADMIN_DIKLAT]: { canInput: true, canFinalize: true, canDelete: true, canViewSelf: true },
-    [USER_ROLES.PEMBIMBING_KLINIK]: { canInput: true, canFinalize: true, canDelete: true, canViewSelf: true },
+    [USER_ROLES.PRESEPTOR]: { canInput: true, canFinalize: true, canDelete: true, canViewSelf: true },
     [USER_ROLES.KEPALA_RUANGAN]: { canInput: true, canFinalize: true, canDelete: true, canViewSelf: true },
     [USER_ROLES.MAHASISWA]: { canInput: false, canFinalize: false, canDelete: false, canViewSelf: true },
   }
