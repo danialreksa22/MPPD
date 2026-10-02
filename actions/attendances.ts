@@ -367,6 +367,29 @@ export async function checkInAction(
       selectedShift = shiftDb || DEFAULT_SHIFTS.find((s) => s.id === shiftId) || null
     }
 
+    // Cek apakah mahasiswa memiliki jadwal di Roster Jaga hari ini
+    if (!selectedShift) {
+      try {
+        const { data: rosterSched } = await supabase
+          .from("roster_schedules")
+          .select("shift_id")
+          .eq("student_id", placement.student_id)
+          .eq("date", targetDate)
+          .maybeSingle()
+
+        if (rosterSched?.shift_id) {
+          const { data: rosterShiftDb } = await supabase
+            .from("work_shifts")
+            .select("*")
+            .eq("id", rosterSched.shift_id)
+            .maybeSingle()
+          selectedShift = rosterShiftDb || DEFAULT_SHIFTS.find((s) => s.id === rosterSched.shift_id) || null
+        }
+      } catch {
+        // Fallback jika tabel roster belum terisi
+      }
+    }
+
     if (!selectedShift) {
       const { data: activeShifts } = await supabase.from("work_shifts").select("*").eq("is_active", true)
       const shiftsList = (activeShifts && activeShifts.length > 0) ? activeShifts : DEFAULT_SHIFTS

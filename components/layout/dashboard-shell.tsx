@@ -9,6 +9,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import { Button } from "@/components/ui/button"
 import { APP_CONFIG, UserRole } from "@/lib/constants"
 import { Menu, X, ChevronRight, Home } from "lucide-react"
+import { InstallPwaButton } from "@/components/pwa/install-pwa-button"
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -37,7 +38,9 @@ export function DashboardShell({
     if (pathname.startsWith("/dashboard/pengajuan")) return "Pengajuan & Verifikasi"
     if (pathname.startsWith("/dashboard/penempatan")) return "Penempatan & Rotasi Stase"
     if (pathname.startsWith("/dashboard/presensi")) return "Presensi Digital"
+    if (pathname.startsWith("/dashboard/roster")) return "Roster Jaga & Kalender Dinas"
     if (pathname.startsWith("/dashboard/penilaian")) return "Penilaian Klinik"
+    if (pathname.startsWith("/dashboard/evaluasi")) return "Kuesioner Evaluasi Stase 360°"
     if (pathname.startsWith("/dashboard/surat")) return "Surat & Dokumen Otomatis"
     if (pathname.startsWith("/dashboard/laporan")) return "Laporan & Analitik Pendidikan"
     if (pathname.startsWith("/dashboard/notifikasi")) return "Pusat Notifikasi & Reminder"
@@ -133,6 +136,9 @@ export function DashboardShell({
               <span className="h-1.5 w-1.5 rounded-full bg-primary" />
               <span>{APP_CONFIG.shortInstitution}</span>
             </div>
+
+            {/* PWA Install Button */}
+            <InstallPwaButton variant="compact" />
 
             {/* Notification Bell */}
             <NotificationBell unreadCount={unreadNotificationsCount} />

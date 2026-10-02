@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="g192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#065f46" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#g192)" />
+  <circle cx="96" cy="96" r="80" fill="none" stroke="#34d399" stroke-width="2" stroke-opacity="0.3" />
+  <!-- Medical Shield -->
+  <path d="M 96 36 C 124 36 139 48 139 68 C 139 109 105 139 96 148 C 87 139 53 109 53 68 C 53 48 68 36 96 36 Z" fill="#ffffff" stroke="#10b981" stroke-width="3" stroke-linejoin="round" />
+  <!-- Medical Cross -->
+  <g fill="#059669">
+    <rect x="85" y="64" width="22" height="44" rx="5" />
+    <rect x="74" y="75" width="44" height="22" rx="5" />
+    <circle cx="96" cy="86" r="4.5" fill="#34d399" />
+  </g>
+  <text x="96" y="168" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#ecfdf5" text-anchor="middle" letter-spacing="1.5">MAGGURU</text>
+</svg>

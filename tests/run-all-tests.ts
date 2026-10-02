@@ -35,6 +35,8 @@ import { runServiceTypeTests } from "./unit/service-types.test"
 import { runPositionTests } from "./unit/positions.test"
 import { runStudentPermissionTests } from "./unit/student-permissions.test"
 import { runStudentAccountGenerationTests } from "./unit/student-account-generation.test"
+import { runRosterTests } from "./unit/roster.test"
+import { runEvaluationTests } from "./unit/evaluations.test"
 
 async function main() {
   const startTime = Date.now()
@@ -57,6 +59,8 @@ async function main() {
     { name: "9. Master Data Jabatan RSUD & Komkordik", fn: runPositionTests },
     { name: "10. Hak Akses Mahasiswa (Presensi Mobile & Read-Only Nilai)", fn: runStudentPermissionTests },
     { name: "11. Otomatisasi Pembuatan Akun Mahasiswa / MPPD", fn: runStudentAccountGenerationTests },
+    { name: "12. Roster Jaga Klinis & Permohonan Tukar Shift", fn: runRosterTests },
+    { name: "13. Kuesioner Evaluasi 360° & Survei Mutu Stase", fn: runEvaluationTests },
   ]
 
   let passedSuites = 0

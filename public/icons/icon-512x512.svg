@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#065f46" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g512)" />
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#34d399" stroke-width="4" stroke-opacity="0.3" stroke-dasharray="12 12" />
+  <!-- Medical Shield -->
+  <path d="M 256 96 C 330 96 370 128 370 180 C 370 290 280 370 256 396 C 232 370 142 290 142 180 C 142 128 182 96 256 96 Z" fill="#ffffff" stroke="#10b981" stroke-width="8" stroke-linejoin="round" />
+  <!-- Hospital Cross -->
+  <g fill="#059669">
+    <rect x="226" y="170" width="60" height="120" rx="14" />
+    <rect x="196" y="200" width="120" height="60" rx="14" />
+    <circle cx="256" cy="230" r="12" fill="#34d399" />
+  </g>
+  <path d="M 200 320 Q 256 350 312 320" fill="none" stroke="#059669" stroke-width="10" stroke-linecap="round" />
+  <circle cx="200" cy="320" r="8" fill="#047857" />
+  <circle cx="312" cy="320" r="8" fill="#047857" />
+  <text x="256" y="445" font-family="system-ui, sans-serif" font-size="34" font-weight="900" fill="#ecfdf5" text-anchor="middle" letter-spacing="4">MAGGURU</text>
+  <text x="256" y="475" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#a7f3d0" text-anchor="middle" letter-spacing="2">RSUD BULUKUMBA</text>
+</svg>

@@ -33,10 +33,15 @@ import {
   GraduationCap,
   Bell,
   Award,
+  CalendarDays,
+  Star,
+  ArrowLeftRight,
+  Clock,
 } from "lucide-react"
 import { getDashboardAnalyticsAction } from "@/actions/reports"
 import { getNotificationsAction } from "@/actions/notifications"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import { InstallPwaButton } from "@/components/pwa/install-pwa-button"
 
 export const dynamic = "force-dynamic"
 
@@ -73,7 +78,7 @@ export default async function DashboardPage() {
     (n) => n.status !== "read"
   ).length
 
-  // Jika pengguna adalah Mahasiswa, ambil data absensi hari ini dan penilaian kliniknya
+  // Jika pengguna adalah Mahasiswa, ambil data absensi hari ini, penilaian kliniknya, jadwal dinas, dan status evaluasi
   let studentAttendance: {
     check_in_time?: string | null
     check_out_time?: string | null
@@ -89,6 +94,16 @@ export default async function DashboardPage() {
     is_finalized?: boolean | null
   } | null = null
 
+  let studentRoster: {
+    shift_name?: string | null
+    shift_code?: string | null
+    room_name?: string | null
+    notes?: string | null
+    time_str?: string | null
+  } | null = null
+
+  let studentEvaluationsCount = 0
+
   if (isStudent && !isPlaceholder) {
     try {
       const adminDb = createAdminClient()
@@ -100,7 +115,7 @@ export default async function DashboardPage() {
 
       if (student) {
         const todayStr = new Date().toISOString().split("T")[0]
-        const [attRes, assessRes] = await Promise.all([
+        const [attRes, assessRes, rosterRes, evalRes] = await Promise.all([
           adminDb
             .from("attendances")
             .select("check_in_time, check_out_time, status")
@@ -113,9 +128,41 @@ export default async function DashboardPage() {
             .eq("student_id", student.id)
             .order("created_at", { ascending: false })
             .maybeSingle(),
+          adminDb
+            .from("roster_schedules")
+            .select("shift_id, notes, work_shifts(name, code, start_time, end_time), rooms_units(name)")
+            .eq("student_id", student.id)
+            .eq("date", todayStr)
+            .maybeSingle(),
+          adminDb
+            .from("stase_evaluations")
+            .select("id", { count: "exact", head: true })
+            .eq("student_id", student.id),
         ])
         studentAttendance = attRes.data
         studentAssessment = assessRes.data
+
+        if (rosterRes.data) {
+          const rawR = rosterRes.data as unknown as {
+            notes?: string | null
+            work_shifts?: { name: string; code: string; start_time: string; end_time: string } | Array<{ name: string; code: string; start_time: string; end_time: string }> | null
+            rooms_units?: { name: string } | Array<{ name: string }> | null
+          }
+          const shiftObj = Array.isArray(rawR.work_shifts) ? rawR.work_shifts[0] : rawR.work_shifts
+          const roomObj = Array.isArray(rawR.rooms_units) ? rawR.rooms_units[0] : rawR.rooms_units
+
+          studentRoster = {
+            shift_name: shiftObj?.name || "Lepas Jaga / Libur",
+            shift_code: shiftObj?.code || "LIBUR",
+            room_name: roomObj?.name || "Ruangan Stase",
+            notes: rawR.notes,
+            time_str: shiftObj
+              ? `${shiftObj.start_time.slice(0, 5)} - ${shiftObj.end_time.slice(0, 5)} WITA`
+              : "Bebas Tugas Dinas",
+          }
+        }
+
+        studentEvaluationsCount = evalRes.count || 0
       }
     } catch {
       // Ignored
@@ -167,6 +214,9 @@ export default async function DashboardPage() {
           </form>
         </div>
       </div>
+
+      {/* PWA Mobile App Install Banner */}
+      <InstallPwaButton variant="banner" />
 
       {/* TAMPILAN KHUSUS MAHASISWA: HANYA MELIHAT NILAI DAN MELAKUKAN ABSENSI */}
       {isStudent ? (
@@ -399,6 +449,148 @@ export default async function DashboardPage() {
                     <span className="flex items-center gap-2">
                       <Award className="h-4 w-4 text-teal-600" />
                       <span>Lihat Rincian Buku Log &amp; Nilai</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
+
+            {/* 3. MODUL ROSTER JAGA & KALENDER DINAS */}
+            <Card className="border-sky-300/60 bg-card shadow-sm flex flex-col justify-between">
+              <div>
+                <CardHeader className="pb-3 border-b border-border/60 bg-sky-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white shadow-xs">
+                        <CalendarDays className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-bold">3. Jadwal Roster Dinas Hari Ini</CardTitle>
+                        <CardDescription className="text-xs">
+                          Alokasi shift jaga rotasi dinas dan kalender penugasan
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge className="bg-sky-600 text-white text-[10px] font-semibold">
+                      {studentRoster?.shift_code || "ROSTER"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-5 space-y-4">
+                  <div className="p-4 rounded-xl border border-border bg-muted/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Shift Terjadwal Hari Ini
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {studentRoster?.room_name || "Ruangan Dinas Aktif"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-lg font-bold text-foreground block">
+                          {studentRoster?.shift_name || "Shift Pagi (Dinas Pagi)"}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {studentRoster?.time_str || "07:00 - 14:00 WITA"}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="border-sky-400 text-sky-700 bg-sky-50 dark:bg-sky-950/60 text-xs font-semibold">
+                        {studentRoster?.notes || "Jadwal Reguler"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Periksa jadwal giliran dinas Anda bulan ini atau ajukan permohonan tukar shift jika berhalangan.
+                  </p>
+                </CardContent>
+              </div>
+
+              <CardFooter className="p-5 pt-0">
+                <Link href="/dashboard/roster" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between h-11 text-sm font-semibold border-sky-300 text-sky-800 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 shadow-xs"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-sky-600" />
+                      <span>Buka Kalender Dinas &amp; Tukar Shift</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
+
+            {/* 4. MODUL KUESIONER EVALUASI STASE 360° */}
+            <Card className="border-amber-300/60 bg-card shadow-sm flex flex-col justify-between">
+              <div>
+                <CardHeader className="pb-3 border-b border-border/60 bg-amber-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+                        <Star className="h-5 w-5 fill-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-bold">4. Kuesioner Evaluasi Stase</CardTitle>
+                        <CardDescription className="text-xs">
+                          Survei kepuasan bimbingan, fasilitas ruangan, &amp; keselamatan kerja
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge className="bg-amber-600 text-white text-[10px] font-semibold">
+                      Mutu Komkordik
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-5 space-y-4">
+                  <div className="p-4 rounded-xl border border-border bg-muted/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Status Partisipasi Evaluasi
+                      </span>
+                      <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 text-[10px]">
+                        Anonim &amp; Independen
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-2xl font-bold text-foreground block">
+                          {studentEvaluationsCount} Stase
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Telah Anda evaluasi selama rotasi di RSUD
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-xs">
+                          ⭐ Skala 1 - 5
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Masukan Anda sangat berharga untuk meningkatkan kualitas bimbingan klinis dan kenyamanan fasilitas RSUD Bulukumba.
+                  </p>
+                </CardContent>
+              </div>
+
+              <CardFooter className="p-5 pt-0">
+                <Link href="/dashboard/evaluasi" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between h-11 text-sm font-semibold border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 shadow-xs"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Star className="h-4 w-4 fill-amber-500 text-amber-600" />
+                      <span>Beri Evaluasi Ruangan &amp; Pembimbing</span>
                     </span>
                     <ArrowRight className="h-4 w-4" />
                   </Button>
