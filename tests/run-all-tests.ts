@@ -3,8 +3,8 @@
  * Automated Test Runner — Pengujian Menyeluruh Tahap 10
  */
 
-import fs from "fs"
-import path from "path"
+import * as fs from "fs"
+import * as path from "path"
 
 // Muat variabel lingkungan lokal jika ada
 const envPath = path.resolve(process.cwd(), ".env.local")
