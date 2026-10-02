@@ -14,6 +14,12 @@ export function createAdminClient() {
     )
   }
 
+  // Polyfill WebSocket di lingkungan server/testing Node.js jika belum ada
+  if (typeof globalThis.WebSocket === "undefined") {
+    // @ts-expect-error Mock class untuk mencegah realtime websocket init crash di server runtime
+    globalThis.WebSocket = class DummyWebSocket {}
+  }
+
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,

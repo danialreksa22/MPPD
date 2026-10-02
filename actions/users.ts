@@ -445,6 +445,25 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
     return { success: false, message: "ID pengguna tidak valid." }
   }
 
+  // 1. Cek otentikasi admin yang sedang melakukan aksi
+  let currentUserId: string | null = null
+  try {
+    const regularClient = await createClient()
+    const { data: currentAuth } = await regularClient.auth.getUser()
+    currentUserId = currentAuth.user?.id || null
+  } catch {
+    // Abaikan jika gagal membaca sesi aktif
+  }
+
+  // Cegah admin menghapus akun yang sedang digunakannya sendiri saat ini
+  if (currentUserId && currentUserId === userId) {
+    return {
+      success: false,
+      message:
+        "Anda tidak dapat menghapus akun Anda sendiri saat sedang masuk. Silakan gunakan akun administrator lain jika ingin menghapus akun ini.",
+    }
+  }
+
   // Lindungi akun administrator utama dari penghapusan
   if (
     userId === "usr-admin-master" ||
@@ -452,34 +471,56 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   ) {
     return {
       success: false,
-      message: "Akun Administrator Utama tidak boleh dihapus demi keamanan dan operasional sistem.",
+      message:
+        "Akun Administrator Utama tidak boleh dihapus demi keamanan dan keberlangsungan operasional sistem.",
     }
   }
 
-  // Validasi format UUID
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)
+  // Validasi format UUID standar
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
   if (!isUuid) {
-    return { success: false, message: "ID pengguna tidak valid atau bukan format UUID." }
+    return {
+      success: false,
+      message:
+        "ID pengguna tidak valid atau merupakan akun demonstrasi bawaan sistem yang tidak dapat dihapus.",
+    }
   }
 
   try {
     const adminSupabase = createAdminClient()
 
-    // 1. Ambil data profil untuk dicatat di audit log & verifikasi email
+    // 2. Ambil data profil untuk dicatat di audit log & verifikasi email
     const { data: profile } = await adminSupabase
       .from("profiles")
       .select("email, full_name")
       .eq("id", userId)
       .maybeSingle()
 
-    if (profile?.email?.toLowerCase() === "admin@rsudbulukumba.id") {
+    if (
+      profile?.email?.toLowerCase() === "admin@rsudbulukumba.id" ||
+      profile?.email?.toLowerCase() === "superadmin@rsudbulukumba.id"
+    ) {
       return {
         success: false,
-        message: "Akun Administrator Utama (admin@rsudbulukumba.id) dilindungi dan tidak dapat dihapus.",
+        message: `Akun Administrator Utama (${profile.email}) dilindungi dan tidak dapat dihapus.`,
       }
     }
 
-    // 2. Lepas relasi foreign key opsional terlebih dahulu agar tidak memblokir penghapusan
+    // 3. Tentukan Administrator Penerus (Fallback Admin) untuk mengamankan data historis rumah sakit
+    // agar relasi foreign key mandatory (NOT NULL) tidak memicu error database 23503
+    let fallbackAdminId: string | null = currentUserId
+    if (!fallbackAdminId) {
+      const { data: adminProfiles } = await adminSupabase
+        .from("user_roles")
+        .select("user_id")
+        .in("role", ["super_admin", "admin_diklat"])
+        .neq("user_id", userId)
+        .limit(1)
+
+      fallbackAdminId = adminProfiles?.[0]?.user_id || null
+    }
+
+    // 4. Lepas relasi foreign key opsional (SET NULL)
     await adminSupabase
       .from("rooms_units")
       .update({ head_of_room_id: null, head_of_room_name: null })
@@ -495,35 +536,76 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
       .update({ user_id: null })
       .eq("user_id", userId)
 
-    // 3. Hapus dari user_roles
+    await adminSupabase
+      .from("student_applications")
+      .update({ verified_by_id: null })
+      .eq("verified_by_id", userId)
+
+    await adminSupabase
+      .from("student_documents")
+      .update({ verified_by_id: null })
+      .eq("verified_by_id", userId)
+
+    await adminSupabase
+      .from("attendances")
+      .update({ approved_by_id: null })
+      .eq("approved_by_id", userId)
+
+    await adminSupabase
+      .from("notifications")
+      .update({ recipient_user_id: null })
+      .eq("recipient_user_id", userId)
+
+    await adminSupabase
+      .from("audit_logs")
+      .update({ user_id: null })
+      .eq("user_id", userId)
+
+    // 5. Alihkan relasi mandatory (NOT NULL) ke fallback admin jika ada
+    if (fallbackAdminId) {
+      await adminSupabase
+        .from("student_applications")
+        .update({ submitted_by_id: fallbackAdminId })
+        .eq("submitted_by_id", userId)
+
+      await adminSupabase
+        .from("assessments")
+        .update({ evaluator_id: fallbackAdminId })
+        .eq("evaluator_id", userId)
+
+      await adminSupabase
+        .from("letters")
+        .update({ generated_by_id: fallbackAdminId })
+        .eq("generated_by_id", userId)
+    }
+
+    // 6. Hapus peran dari public.user_roles
     await adminSupabase.from("user_roles").delete().eq("user_id", userId)
 
-    // 4. Hapus dari profiles
+    // 7. Hapus dari Supabase Auth Admin terlebih dahulu (agar cascading ke profiles jika ada constraint)
+    try {
+      await adminSupabase.auth.admin.deleteUser(userId)
+    } catch (authErr) {
+      console.warn("Peringatan saat delete user di auth:", authErr)
+    }
+
+    // 8. Hapus dari public.profiles
     const { error: profileError } = await adminSupabase.from("profiles").delete().eq("id", userId)
     if (profileError) {
       if (profileError.code === "23503") {
         return {
           success: false,
           message:
-            "Pengguna ini memiliki riwayat dokumen stase/penilaian/pengajuan resmi rumah sakit sehingga tidak dapat dihapus permanen. Anda dapat mencabut seluruh hak aksesnya melalui menu 'Atur Akses'.",
+            "Pengguna ini memiliki riwayat naskah dinas/surat stase penting rumah sakit yang tidak dapat dihapus langsung. Hak akses pengguna telah dicabut sepenuhnya.",
         }
       }
       throw profileError
     }
 
-    // 5. Hapus dari Supabase Auth
-    const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
-    if (authError) {
-      console.warn("Peringatan saat delete user di auth:", authError.message)
-    }
-
-    // 6. Catat audit
+    // 9. Catat jejak audit penghapusan
     try {
-      const regularClient = await createClient()
-      const { data: currentAuth } = await regularClient.auth.getUser()
-
       await adminSupabase.from("audit_logs").insert({
-        user_id: currentAuth.user?.id || userId,
+        user_id: currentUserId || userId,
         action: "DELETE_USER",
         entity_table: "profiles",
         entity_id: userId,

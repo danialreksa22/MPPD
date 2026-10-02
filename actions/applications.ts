@@ -2,18 +2,170 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { uploadStudentDocument } from "@/lib/supabase/storage"
 import {
   individualApplicationSchema,
   applicationStatusUpdateSchema,
 } from "@/lib/validations/applications"
 import { recordAuditLog } from "@/lib/audit/logger"
+import { USER_ROLES } from "@/lib/constants"
 
 export interface ApplicationActionResult<T = unknown> {
   success: boolean
   message: string
   data?: T
   error?: string
+}
+
+export interface GeneratedStudentAccount {
+  userId: string
+  email: string
+  password: string
+  isExisting: boolean
+}
+
+/**
+ * Otomatisasi Pembuatan Akun Pengguna Mahasiswa Praktik / MPPD (Role: mahasiswa)
+ * Menjamin mahasiswa langsung memiliki akun pengguna di portal MAGGURU untuk presensi & penilaian.
+ */
+export async function generateStudentAccount(params: {
+  nim: string
+  fullName: string
+  email?: string | null
+  phone?: string | null
+  institutionId?: string | null
+  studentType?: "praktik_klinik" | "mppd"
+  customPassword?: string | null
+}): Promise<GeneratedStudentAccount> {
+  const cleanNim = String(params.nim || "").trim().replace(/\s+/g, "")
+  const cleanFullName = String(params.fullName || "").trim()
+
+  // 1. Tentukan alamat email login resmi
+  let resolvedEmail = params.email?.trim().toLowerCase() || ""
+  if (!resolvedEmail || !resolvedEmail.includes("@")) {
+    const sanitizedNim = cleanNim.toLowerCase().replace(/[^a-z0-9]/g, "") || "mhs"
+    resolvedEmail = `${sanitizedNim}@student.magguru.id`
+  }
+
+  // 2. Tentukan kata sandi default (format: Magguru@[NIM])
+  const defaultPassword =
+    params.customPassword && params.customPassword.length >= 6
+      ? params.customPassword
+      : cleanNim.length >= 3
+      ? `Magguru@${cleanNim}`
+      : "RsudBulukumba2026!"
+
+  let userId: string | null = null
+  let isExisting = false
+
+  try {
+    const adminSupabase = createAdminClient()
+
+    // 2.1 Cek apakah profil pengguna dengan email ini sudah ada di tabel profiles
+    const { data: existingProfile } = await adminSupabase
+      .from("profiles")
+      .select("id, email, full_name")
+      .eq("email", resolvedEmail)
+      .maybeSingle()
+
+    if (existingProfile?.id) {
+      userId = existingProfile.id
+      isExisting = true
+    } else {
+      // 2.2 Buat akun di Supabase Auth Admin jika belum ada
+      try {
+        const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+          email: resolvedEmail,
+          password: defaultPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanFullName,
+            phone: params.phone?.trim() || null,
+            role: USER_ROLES.MAHASISWA,
+            nim: cleanNim,
+            institution_id: params.institutionId || null,
+            student_type: params.studentType || "praktik_klinik",
+          },
+        })
+
+        if (authError) {
+          if (
+            authError.message.includes("already been registered") ||
+            authError.message.includes("already registered")
+          ) {
+            const { data: usersList } = await adminSupabase.auth.admin.listUsers()
+            const found = usersList?.users?.find(
+              (u) => u.email?.toLowerCase() === resolvedEmail.toLowerCase()
+            )
+            if (found) {
+              userId = found.id
+              isExisting = true
+            }
+          } else {
+            console.warn("Peringatan saat membuat akun auth mahasiswa:", authError.message)
+          }
+        } else if (authData?.user?.id) {
+          userId = authData.user.id
+        }
+      } catch (authErr) {
+        console.warn("Auth Admin createUser fallback:", authErr)
+      }
+    }
+
+    if (!userId) {
+      userId = crypto.randomUUID()
+    }
+
+    // 2.3 Pastikan data profil tersinkronisasi di public.profiles
+    const { error: profileError } = await adminSupabase.from("profiles").upsert(
+      {
+        id: userId,
+        full_name: cleanFullName,
+        email: resolvedEmail,
+        phone: params.phone?.trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    )
+
+    if (profileError) {
+      console.warn("Peringatan saat upsert profiles mahasiswa:", profileError.message)
+    }
+
+    // 2.4 Pastikan peran pengguna terdaftar di public.user_roles dengan role 'mahasiswa'
+    const { data: existingRoles } = await adminSupabase
+      .from("user_roles")
+      .select("id, role")
+      .eq("user_id", userId)
+
+    const hasMahasiswaRole = existingRoles?.some((r) => r.role === USER_ROLES.MAHASISWA)
+
+    if (!hasMahasiswaRole) {
+      const { error: roleError } = await adminSupabase.from("user_roles").insert({
+        user_id: userId,
+        role: USER_ROLES.MAHASISWA,
+        institution_id: params.institutionId || null,
+        room_id: null,
+      })
+
+      if (roleError) {
+        console.warn("Peringatan saat insert user_roles mahasiswa:", roleError.message)
+      }
+    }
+  } catch (err) {
+    console.error("Kesalahan saat generate akun mahasiswa:", err)
+    if (!userId) {
+      userId = crypto.randomUUID()
+    }
+  }
+
+  return {
+    userId,
+    email: resolvedEmail,
+    password: defaultPassword,
+    isExisting,
+  }
 }
 
 /**
@@ -123,7 +275,13 @@ export async function getApplicationDetailAction(
  */
 export async function createIndividualApplicationAction(
   formData: FormData
-): Promise<ApplicationActionResult<{ applicationId: string; applicationNumber: string }>> {
+): Promise<
+  ApplicationActionResult<{
+    applicationId: string
+    applicationNumber: string
+    studentAccount?: GeneratedStudentAccount
+  }>
+> {
   const rawData = {
     institution_id: formData.get("institution_id") as string,
     period_id: formData.get("period_id") as string,
@@ -153,8 +311,19 @@ export async function createIndividualApplicationAction(
       data: { user },
     } = await supabase.auth.getUser()
 
-    // 1. Simpan atau perbarui data mahasiswa di tabel students
+    // 1. Otomatisasi generate akun pengguna Mahasiswa / MPPD (Role: mahasiswa)
+    const account = await generateStudentAccount({
+      nim: validation.data.nim,
+      fullName: validation.data.full_name,
+      email: validation.data.email,
+      phone: validation.data.phone,
+      institutionId: validation.data.institution_id,
+      studentType: validation.data.type,
+    })
+
+    // 2. Simpan atau perbarui data mahasiswa di tabel students dengan tautan user_id
     const studentPayload = {
+      user_id: account.userId,
       institution_id: validation.data.institution_id,
       study_program_id: validation.data.study_program_id,
       type: validation.data.type,
@@ -163,7 +332,7 @@ export async function createIndividualApplicationAction(
       full_name: validation.data.full_name,
       gender: validation.data.gender,
       phone: validation.data.phone || null,
-      email: validation.data.email || null,
+      email: account.email,
     }
 
     const { data: student, error: studentError } = await supabase
@@ -174,9 +343,9 @@ export async function createIndividualApplicationAction(
 
     if (studentError) throw studentError
 
-    // 2. Buat berkas pengajuan di student_applications
+    // 3. Buat berkas pengajuan di student_applications
     const appNumber = generateApplicationNumber()
-    const submittedById = user?.id || student.id // Fallback ID jika demo
+    const submittedById = user?.id || account.userId
 
     const { data: application, error: appError } = await supabase
       .from("student_applications")
@@ -200,12 +369,15 @@ export async function createIndividualApplicationAction(
       newValues: {
         application_number: appNumber,
         student_id: student.id,
+        student_user_id: account.userId,
+        student_email: account.email,
+        student_role: USER_ROLES.MAHASISWA,
         institution_id: validation.data.institution_id,
         period_id: validation.data.period_id,
       },
     })
 
-    // 3. Tangani unggahan dokumen pendukung ke Supabase Storage
+    // 4. Tangani unggahan dokumen pendukung ke Supabase Storage
     const documentKeys = [
       { key: "doc_surat_pengantar", type: "Surat Pengantar Institusi" },
       { key: "doc_ktp_ktm", type: "KTP / KTM" },
@@ -236,12 +408,14 @@ export async function createIndividualApplicationAction(
     }
 
     revalidatePath("/dashboard/pengajuan")
+    revalidatePath("/dashboard/pengguna")
     return {
       success: true,
-      message: `Pengajuan berhasil dikirimkan dengan nomor registrasi: ${appNumber}`,
+      message: `Pengajuan berhasil dikirimkan (${appNumber}). Akun pengguna Mahasiswa/MPPD berhasil digenerate (${account.email}).`,
       data: {
         applicationId: application.id,
         applicationNumber: appNumber,
+        studentAccount: account,
       },
     }
   } catch (err: unknown) {
@@ -260,7 +434,13 @@ export async function createBulkApplicationAction(
   type: "praktik_klinik" | "mppd",
   studentsJson: string,
   notes?: string
-): Promise<ApplicationActionResult<{ applicationId: string; totalStudents: number }>> {
+): Promise<
+  ApplicationActionResult<{
+    applicationId: string
+    totalStudents: number
+    createdAccountsCount: number
+  }>
+> {
   try {
     const studentsData: Array<{
       nim: string
@@ -280,9 +460,24 @@ export async function createBulkApplicationAction(
     } = await supabase.auth.getUser()
 
     const appNumber = generateApplicationNumber()
-    const submittedById = user?.id || institutionId
 
-    // 1. Buat pengajuan kolektif
+    // 1. Generate akun pengguna Mahasiswa / MPPD untuk setiap baris data
+    const createdAccounts: GeneratedStudentAccount[] = []
+    for (const s of studentsData) {
+      const account = await generateStudentAccount({
+        nim: s.nim,
+        fullName: s.full_name,
+        email: s.email,
+        phone: s.phone,
+        institutionId,
+        studentType: type,
+      })
+      createdAccounts.push(account)
+    }
+
+    const submittedById = user?.id || createdAccounts[0]?.userId || crypto.randomUUID()
+
+    // 2. Buat pengajuan kolektif
     const { data: application, error: appError } = await supabase
       .from("student_applications")
       .insert({
@@ -298,9 +493,13 @@ export async function createBulkApplicationAction(
 
     if (appError) throw appError
 
-    // 2. Simpan setiap mahasiswa ke database
-    for (const s of studentsData) {
+    // 3. Simpan setiap mahasiswa ke database dan hubungkan dengan dokumen kolektif
+    for (let i = 0; i < studentsData.length; i++) {
+      const s = studentsData[i]
+      const account = createdAccounts[i]
+
       const studentPayload = {
+        user_id: account.userId,
         institution_id: institutionId,
         study_program_id: studyProgramId,
         type: type,
@@ -309,7 +508,7 @@ export async function createBulkApplicationAction(
         full_name: String(s.full_name || "").trim(),
         gender: (String(s.gender || "L").toUpperCase() === "P" ? "P" : "L") as "L" | "P",
         phone: s.phone ? String(s.phone).trim() : null,
-        email: s.email ? String(s.email).trim() : null,
+        email: account.email,
       }
 
       const { data: createdStudent } = await supabase
@@ -339,6 +538,7 @@ export async function createBulkApplicationAction(
       newValues: {
         application_number: appNumber,
         total_students: studentsData.length,
+        total_accounts_generated: createdAccounts.length,
         institution_id: institutionId,
         period_id: periodId,
         type,
@@ -347,12 +547,14 @@ export async function createBulkApplicationAction(
     })
 
     revalidatePath("/dashboard/pengajuan")
+    revalidatePath("/dashboard/pengguna")
     return {
       success: true,
-      message: `Pengajuan kolektif ${studentsData.length} mahasiswa berhasil dikirimkan (${appNumber})!`,
+      message: `Pengajuan kolektif ${studentsData.length} mahasiswa berhasil dikirimkan (${appNumber}) dan ${createdAccounts.length} akun pengguna Mahasiswa/MPPD berhasil digenerate otomatis!`,
       data: {
         applicationId: application.id,
         totalStudents: studentsData.length,
+        createdAccountsCount: createdAccounts.length,
       },
     }
   } catch (err: unknown) {

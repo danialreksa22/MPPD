@@ -22,6 +22,9 @@ import {
   AlertCircle,
   Loader2,
   Info,
+  Key,
+  Copy,
+  Check,
 } from "lucide-react"
 
 interface IndividualApplicationFormProps {
@@ -45,7 +48,22 @@ export function IndividualApplicationForm({
     "praktik_klinik"
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [feedback, setFeedback] = useState<{ message: string; isError?: boolean } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [feedback, setFeedback] = useState<{
+    message: string
+    isError?: boolean
+    account?: {
+      email: string
+      password?: string
+      isExisting?: boolean
+    }
+  } | null>(null)
+
+  function handleCopyCredentials(email: string, pass: string) {
+    navigator.clipboard.writeText(`Email: ${email}\nPassword: ${pass}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   // Filter prodi sesuai institusi yang dipilih
   const filteredPrograms = studyPrograms.filter(
@@ -64,10 +82,13 @@ export function IndividualApplicationForm({
     setIsSubmitting(false)
 
     if (res.success) {
-      setFeedback({ message: res.message })
+      setFeedback({
+        message: res.message,
+        account: res.data?.studentAccount,
+      })
       setTimeout(() => {
         router.push("/dashboard/pengajuan")
-      }, 1500)
+      }, 4000)
     } else {
       setFeedback({ message: res.message, isError: true })
     }
@@ -78,18 +99,72 @@ export function IndividualApplicationForm({
       {/* Alert Feedback */}
       {feedback && (
         <div
-          className={`flex items-center gap-2.5 p-4 rounded-xl text-xs ${
+          className={`p-4 rounded-xl text-xs space-y-3 transition-all ${
             feedback.isError
-              ? "bg-rose-50 text-rose-800 border border-rose-200"
-              : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              ? "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200"
+              : "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
           }`}
         >
-          {feedback.isError ? (
-            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <div className="flex items-center gap-2.5">
+            {feedback.isError ? (
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            )}
+            <span className="font-semibold">{feedback.message}</span>
+          </div>
+
+          {feedback.account && (
+            <div className="mt-2 pt-2.5 border-t border-emerald-200 dark:border-emerald-800/80 bg-card p-3 rounded-lg border border-border shadow-xs text-foreground space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <Key className="h-3.5 w-3.5" />
+                  Kredensial Akun Mahasiswa Praktik / MPPD:
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopyCredentials(
+                      feedback.account!.email,
+                      feedback.account!.password || "Magguru@[NIM]"
+                    )
+                  }
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span>Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Salin Kredensial</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono bg-muted/40 p-2.5 rounded-md">
+                <div>
+                  <span className="text-muted-foreground font-sans text-[11px]">Email Login:</span>{" "}
+                  <strong className="text-primary font-semibold select-all">
+                    {feedback.account.email}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground font-sans text-[11px]">Kata Sandi Default:</span>{" "}
+                  <strong className="text-foreground font-semibold select-all">
+                    {feedback.account.password || "Magguru@[NIM]"}
+                  </strong>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground font-sans">
+                Mahasiswa dapat langsung masuk ke portal MAGGURU dengan email &amp; sandi di atas untuk presensi GPS dan penilaian stase.
+              </p>
+            </div>
           )}
-          <span className="font-medium">{feedback.message}</span>
         </div>
       )}
 
@@ -282,16 +357,25 @@ export function IndividualApplicationForm({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground" htmlFor="email">
-                Alamat Email Mahasiswa
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5" htmlFor="email">
+                  <span>Alamat Email Mahasiswa</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">(Akun Login)</span>
+                </label>
+                <span className="inline-flex items-center gap-1 text-[10px] text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full">
+                  <Key className="h-2.5 w-2.5" /> Auto-generate Akun
+                </span>
+              </div>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="mahasiswa@kampus.ac.id"
+                placeholder="mahasiswa@kampus.ac.id (opsional, auto: [nim]@student.magguru.id)"
                 className="text-xs"
               />
+              <p className="text-[10px] text-muted-foreground">
+                Akun pengguna role <strong>Mahasiswa/MPPD</strong> otomatis dibuat dengan kata sandi default <code>Magguru@[NIM]</code>.
+              </p>
             </div>
           </div>
 

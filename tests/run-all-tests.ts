@@ -3,6 +3,27 @@
  * Automated Test Runner — Pengujian Menyeluruh Tahap 10
  */
 
+import fs from "fs"
+import path from "path"
+
+// Muat variabel lingkungan lokal jika ada
+const envPath = path.resolve(process.cwd(), ".env.local")
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf-8")
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith("#")) continue
+    const idx = trimmed.indexOf("=")
+    if (idx !== -1) {
+      const key = trimmed.slice(0, idx).trim()
+      const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "")
+      if (!process.env[key]) {
+        process.env[key] = val
+      }
+    }
+  }
+}
+
 import { runQuotaTests } from "./unit/quota.test"
 import { runGeofenceTests } from "./unit/geofence.test"
 import { runAssessmentTests } from "./unit/assessments.test"
@@ -13,6 +34,7 @@ import { runShiftTests } from "./unit/shifts.test"
 import { runServiceTypeTests } from "./unit/service-types.test"
 import { runPositionTests } from "./unit/positions.test"
 import { runStudentPermissionTests } from "./unit/student-permissions.test"
+import { runStudentAccountGenerationTests } from "./unit/student-account-generation.test"
 
 async function main() {
   const startTime = Date.now()
@@ -34,6 +56,7 @@ async function main() {
     { name: "8. Master Data Jenis Pelayanan RSUD", fn: runServiceTypeTests },
     { name: "9. Master Data Jabatan RSUD & Komkordik", fn: runPositionTests },
     { name: "10. Hak Akses Mahasiswa (Presensi Mobile & Read-Only Nilai)", fn: runStudentPermissionTests },
+    { name: "11. Otomatisasi Pembuatan Akun Mahasiswa / MPPD", fn: runStudentAccountGenerationTests },
   ]
 
   let passedSuites = 0

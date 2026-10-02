@@ -31,6 +31,7 @@ import {
   Loader2,
   Users,
   Info,
+  Key,
 } from "lucide-react"
 
 interface BulkStudentParsed {
@@ -438,9 +439,9 @@ export function BulkImportForm({
           </CardContent>
           <CardFooter className="flex items-center justify-between border-t border-border pt-4">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+              <Key className="h-3.5 w-3.5 text-primary shrink-0" />
               <span>
-                Total {parsedStudents.length} calon mahasiswa akan didaftarkan ke sistem MAGGURU.
+                Total <strong>{parsedStudents.length} akun pengguna</strong> role Mahasiswa/MPPD akan otomatis dibuat (Kata sandi default: <code>Magguru@[NIM]</code>).
               </span>
             </div>
 
