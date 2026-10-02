@@ -6,7 +6,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MAGGURU",
     description:
       "Sistem Informasi Pendataan & Presensi Digital Mahasiswa Praktik Klinik dan MPPD Kedokteran RSUD Bulukumba",
-    start_url: "/dashboard",
+    id: "/",
+    start_url: "/login?source=pwa",
+    scope: "/",
     display: "standalone",
     orientation: "portrait-primary",
     background_color: "#ffffff",

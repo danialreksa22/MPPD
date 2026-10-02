@@ -4,6 +4,7 @@ import { APP_CONFIG } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserCircle } from "lucide-react"
+import { InstallPwaButton } from "@/components/pwa/install-pwa-button"
 
 export function Navbar() {
   return (
@@ -58,6 +59,9 @@ export function Navbar() {
           </Link>
 
           <div className="h-4 w-px bg-border hidden md:inline-block" />
+
+          {/* Tombol Install PWA */}
+          <InstallPwaButton variant="navbar" />
 
           {/* Login Button */}
           <Link href="/login">

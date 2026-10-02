@@ -6,6 +6,7 @@ import Image from "next/image"
 import { signInAction, AuthActionResult } from "@/actions/auth"
 import { APP_CONFIG } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
+import { InstallPwaButton } from "@/components/pwa/install-pwa-button"
 import {
   Card,
   CardContent,
@@ -152,6 +153,9 @@ export default function LoginPage() {
             </CardFooter>
           </form>
         </Card>
+
+        {/* Tombol Pasang Aplikasi PWA Mobile */}
+        <InstallPwaButton variant="login" />
       </div>
     </div>
   )
